@@ -47,7 +47,7 @@ In the following, we call the root directory of the repository `BASEtoolbox.jl` 
 
 ### Building the documentation
 
-You can build the documentation *locally* by starting a new Julia REPL in the root directory of the repository, activating the environment, and running the following command: `include("docs/make.jl")`. You can access the documentation, once it is built locally, via running `python3 -m http.server --directory docs/build/`. If you then open your browser at [http://localhost:8000](http://localhost:8000), the documentation should render properly. Beyond that, the documentation is hosted via GitHub Pages and can be accessed [here](https://hildebrandecon.github.io/BASEtoolbox.jl/).
+You can build the documentation *locally* by starting a new Julia REPL in the root directory of the repository, activating the environment, and running the following command: `include("docs/make.jl")`. You can access the documentation, once it is built locally, via running `python3 -m http.server --directory docs/build/`. If you then open your browser at [http://localhost:8000](http://localhost:8000), the documentation should render properly. Beyond that, the documentation is hosted via GitHub Pages and can be accessed [here](https://baseforhank.github.io/BASEtoolbox.jl/).
 
 ### Getting started with your model
 
