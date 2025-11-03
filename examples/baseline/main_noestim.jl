@@ -155,24 +155,7 @@ exovars = [getfield(sr_full.indexes, shock_names[i]) for i = 1:length(shock_name
 stds = [getfield(sr_full.m_par, Symbol("σ_", i)) for i in shock_names];
 
 # Compute IRFs
-IRFs, _, IRFs_order = compute_irfs(
-    exovars,
-    lr_full.State2Control,
-    lr_full.LOMstate,
-    sr_full.XSS,
-    sr_full.indexes;
-    init_val = stds,
-);
-
-# Compute variance decomposition of IRFs
-VDs = compute_vardecomp(IRFs);
-
-# Compute business cycle frequency variance decomposition
-VDbcs, UnconditionalVar =
-    compute_vardecomp_bcfreq(exovars, stds, lr_full.State2Control, lr_full.LOMstate);
-
-# Compute distributional IRFs
-_, _, _, IRFs_dist = compute_irfs(
+IRFs, _, IRFs_order, IRFs_dist = compute_irfs(
     exovars,
     lr_full.State2Control,
     lr_full.LOMstate,
@@ -181,7 +164,15 @@ _, _, _, IRFs_dist = compute_irfs(
     init_val = stds,
     distribution = true,
     comp_ids = sr_full.compressionIndexes,
+    n_par = sr_full.n_par,
 );
+
+# Compute variance decomposition of IRFs
+VDs = compute_vardecomp(IRFs);
+
+# Compute business cycle frequency variance decomposition
+VDbcs, UnconditionalVar =
+    compute_vardecomp_bcfreq(exovars, stds, lr_full.State2Control, lr_full.LOMstate);
 
 ## ------------------------------------------------------------------------------------------
 ## Graphical outputs
@@ -372,14 +363,21 @@ plot_distributional_irfs(
         (:Sshock, "Income risk"),
     ],
     [
-        ("Wb", "Marginal Value of Bonds"),
-        ("Wk", "Marginal Value of Capital"),
-        ("distr_b", "Bonds"),
-        ("distr_k", "Capital"),
-        ("distr", "Bonds and Capital"),
+        ("Wb_b", "Marginal Value of Bonds, over Bonds"),
+        ("Wk_k", "Marginal Value of Capital, over Capital"),
+        ("PDF_b", "Marginal PDF of Bonds"),
+        ("PDF_k", "Marginal PDF of Capital"),
+        ("PDF_bk", "Marginal PDF of Bonds and Capital"),
+        ("PDF_bh", "Marginal PDF of Bonds and Human Capital"),
+        ("PDF_kh", "Marginal PDF of Capital and Human Capital"),
     ],
     IRFs_dist,
-    IRFs_order;
+    IRFs_order,
+    sr_full.n_par;
+    bounds = Dict(
+        "b" => (sr_full.n_par.grid_b[1], 100.0),
+        "k" => (sr_full.n_par.grid_k[1], 100.0),
+    ),
     show_fig = false,
     save_fig = true,
     path = paths["bld_example"] * "/IRFs_dist",

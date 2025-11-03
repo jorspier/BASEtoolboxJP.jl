@@ -1,5 +1,5 @@
 """
-Mainboard for a one asset version of the baseline example, no estimation.
+Mainboard for the baseline example of the BASEforHANK package, no estimation.
 """
 
 using PrettyTables, Printf;
@@ -38,6 +38,15 @@ BASEforHANK.LinearAlgebra.BLAS.set_num_threads(Threads.nthreads());
 m_par = ModelParameters();
 e_set = BASEforHANK.e_set;
 
+@set! m_par.spend_adj = 1.0;
+@set! m_par.γ_B = 0.3;
+@set! m_par.γ_B2 = 0.3;
+@set! m_par.γ_Y = 0.1;
+@set! m_par.γ_Y2 = 0.1;
+@set! m_par.θ_π = 2.5;
+@set! m_par.ρ_β2level = 0.2;
+@set! m_par.ρ_β2shock = 0.2;
+
 ## ------------------------------------------------------------------------------------------
 ## Calculate Steady State and prepare linearization
 ## ------------------------------------------------------------------------------------------
@@ -74,6 +83,27 @@ pretty_table(
     formatters = ft_printf("%.4f"),
 )
 
+# compute steady state moments for country 2
+K2 = exp.(sr_full.XSS[sr_full.indexes.K2SS]);
+B2 = exp.(sr_full.XSS[sr_full.indexes.B2SS]);
+Bgov2 = exp.(sr_full.XSS[sr_full.indexes.Bgov2SS]);
+Y2 = exp.(sr_full.XSS[sr_full.indexes.Y2SS]);
+G2 = exp.(sr_full.XSS[sr_full.indexes.G2SS]);
+
+# Display steady state moments
+@printf "\n"
+pretty_table(
+    [
+        "Liquid to Illiquid Assets Ratio" B2/K2
+        "Capital to Output Ratio" K2 / Y2/4.0
+        "Government Debt to Output Ratio" Bgov2 / Y2/4.0
+        "Government Spending to Output Ratio" G2/Y2
+    ];
+    header = ["Variable", "Value"],
+    title = "Steady State Moments Country 2",
+    formatters = ft_printf("%.4f"),
+)
+
 ## ------------------------------------------------------------------------------------------
 ## Linearize the full model, find sparse state-space representation
 ## ------------------------------------------------------------------------------------------
@@ -94,16 +124,13 @@ exovars = [getfield(sr_full.indexes, shock_names[i]) for i = 1:length(shock_name
 stds = [getfield(sr_full.m_par, Symbol("σ_", i)) for i in shock_names];
 
 # Compute IRFs
-IRFs, _, IRFs_order, IRFs_dist = compute_irfs(
+IRFs, _, IRFs_order = compute_irfs(
     exovars,
     lr_full.State2Control,
     lr_full.LOMstate,
     sr_full.XSS,
     sr_full.indexes;
     init_val = stds,
-    distribution = true,
-    comp_ids = sr_full.compressionIndexes,
-    n_par = sr_full.n_par,
 );
 
 # Compute variance decomposition of IRFs
@@ -154,165 +181,6 @@ plot_irfs(
     path = paths["bld_example"] * "/IRFs",
     yscale = "standard",
     style_options = (lw = 2, color = [:blue, :red], linestyle = [:solid, :dash]),
-);
-
-mkpath(paths["bld_example"] * "/IRFs_cat");
-plot_irfs_cat(
-    Dict(
-        ("Monetary", "mon") => [:Rshock, :A],
-        ("Fiscal", "fis") => [:Gshock, :Tprogshock],
-        ("Productivity", "pro") => [:Z, :ZI, :μ, :μw],
-    ),
-    [
-        (:Ygrowth, "Output growth"),
-        (:Cgrowth, "Consumption growth"),
-        (:Igrowth, "Investment growth"),
-        (:N, "Employment"),
-        (:wgrowth, "Wage growth"),
-        (:RB, "Nominal rate"),
-        (:π, "Inflation"),
-        (:σ, "Income risk"),
-        (:Tprog, "Tax progressivity"),
-        (:TOP10Wshare, "Top 10 wealth share"),
-        (:TOP10Ishare, "Top 10 inc. share"),
-    ],
-    IRFs,
-    IRFs_order,
-    sr_full.indexes;
-    show_fig = false,
-    save_fig = true,
-    path = paths["bld_example"] * "/IRFs_cat",
-    yscale = "standard",
-    style_options = (lw = 2, color = [:blue, :red], linestyle = [:solid, :dash]),
-);
-
-mkpath(paths["bld_example"] * "/VDs");
-plot_vardecomp(
-    [
-        (:Ygrowth, "Output growth"),
-        (:Cgrowth, "Consumption growth"),
-        (:Igrowth, "Investment growth"),
-        (:N, "Employment"),
-        (:wgrowth, "Wage growth"),
-        (:RB, "Nominal rate"),
-        (:π, "Inflation"),
-        (:σ, "Income risk"),
-        (:Tprog, "Tax progressivity"),
-        (:TOP10Wshare, "Top 10 wealth share"),
-        (:TOP10Ishare, "Top 10 inc. share"),
-    ],
-    [(VDs, "Baseline")],
-    IRFs_order,
-    sr_full.indexes;
-    show_fig = false,
-    save_fig = true,
-    path = paths["bld_example"] * "/VDs",
-);
-
-mkpath(paths["bld_example"] * "/VDs_cat");
-plot_vardecomp(
-    [
-        (:Ygrowth, "Output growth"),
-        (:Cgrowth, "Consumption growth"),
-        (:Igrowth, "Investment growth"),
-        (:N, "Employment"),
-        (:wgrowth, "Wage growth"),
-        (:RB, "Nominal rate"),
-        (:π, "Inflation"),
-        (:σ, "Income risk"),
-        (:Tprog, "Tax progressivity"),
-        (:TOP10Wshare, "Top 10 wealth share"),
-        (:TOP10Ishare, "Top 10 inc. share"),
-    ],
-    [(VDs, "Baseline")],
-    IRFs_order,
-    sr_full.indexes;
-    shock_categories = Dict(
-        ("Monetary", "mon") => [:Rshock, :A],
-        ("Fiscal", "fis") => [:Gshock, :Tprogshock],
-        ("Productivity", "pro") => [:Z, :ZI, :μ, :μw],
-    ),
-    show_fig = false,
-    save_fig = true,
-    path = paths["bld_example"] * "/VDs_cat",
-);
-
-mkpath(paths["bld_example"] * "/VDbcs");
-plot_vardecomp_bcfreq(
-    [
-        (:Ygrowth, "Output growth"),
-        (:Cgrowth, "Consumption growth"),
-        (:Igrowth, "Investment growth"),
-        (:N, "Employment"),
-        (:wgrowth, "Wage growth"),
-        (:RB, "Nominal rate"),
-        (:π, "Inflation"),
-        (:σ, "Income risk"),
-        (:Tprog, "Tax progressivity"),
-        (:TOP10Wshare, "Top 10 wealth share"),
-        (:TOP10Ishare, "Top 10 inc. share"),
-    ],
-    [(VDbcs, "Baseline")],
-    IRFs_order,
-    sr_full.indexes;
-    show_fig = false,
-    save_fig = true,
-    path = paths["bld_example"] * "/VDbcs",
-);
-
-mkpath(paths["bld_example"] * "/VDbcs_cat");
-plot_vardecomp_bcfreq(
-    [
-        (:Ygrowth, "Output growth"),
-        (:Cgrowth, "Consumption growth"),
-        (:Igrowth, "Investment growth"),
-        (:N, "Employment"),
-        (:wgrowth, "Wage growth"),
-        (:RB, "Nominal rate"),
-        (:π, "Inflation"),
-        (:σ, "Income risk"),
-        (:Tprog, "Tax progressivity"),
-        (:TOP10Wshare, "Top 10 wealth share"),
-        (:TOP10Ishare, "Top 10 inc. share"),
-    ],
-    [(VDbcs, "Baseline")],
-    IRFs_order,
-    sr_full.indexes;
-    shock_categories = Dict(
-        ("Monetary", "mon") => [:Rshock, :A],
-        ("Fiscal", "fis") => [:Gshock, :Tprogshock],
-        ("Productivity", "pro") => [:Z, :ZI, :μ, :μw],
-    ),
-    show_fig = false,
-    save_fig = true,
-    path = paths["bld_example"] * "/VDbcs_cat",
-);
-
-mkpath(paths["bld_example"] * "/IRFs_dist");
-plot_distributional_irfs(
-    [
-        (:Z, "TFP"),
-        (:ZI, "Inv.-spec. tech."),
-        (:μ, "Price markup"),
-        (:μw, "Wage markup"),
-        (:A, "Risk premium"),
-        (:Rshock, "Mon. policy"),
-        (:Gshock, "Structural deficit"),
-        (:Tprogshock, "Tax progr."),
-        (:Sshock, "Income risk"),
-    ],
-    [
-        ("Wb_b", "Marginal Value of Bonds, over Bonds"),
-        ("PDF_b", "Marginal PDF of Bonds"),
-        ("PDF_bh", "Marginal PDF of Bonds and Human Capital"),
-    ],
-    IRFs_dist,
-    IRFs_order,
-    sr_full.n_par;
-    bounds = Dict("b" => (sr_full.n_par.grid_b[1], 100.0)),
-    show_fig = false,
-    save_fig = true,
-    path = paths["bld_example"] * "/IRFs_dist",
 );
 
 @printf "\n"

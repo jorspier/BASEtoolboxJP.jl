@@ -75,7 +75,7 @@ function Fsys(
 
     ## Unpack steady state distributions --------------------------------------------------
 
-    # steads state cdfs (on value grid)
+    # steady state cdfs (on value grid)
     CDF_bSS = cumsum(XSS[indexes.distr_bSS]) .+ zeros(eltype(θD), n_par.nb)
     CDF_kSS = cumsum(XSS[indexes.distr_kSS]) .+ zeros(eltype(θD), n_par.nk)
     CDF_hSS = cumsum(XSS[indexes.distr_hSS]) .+ zeros(eltype(θD), n_par.nh)
