@@ -12,6 +12,7 @@ using ..Parsing
 using ..IncomesETC
 using ..SteadyState
 using ..PerturbationSolution
+using ..LoggingTools
 
 # 3rd Party modules
 using LinearAlgebra,
@@ -39,6 +40,7 @@ export mode_finding, likeli, nearest_spd, rwmh
 
 include("Estimation/likeli.jl")
 include("Estimation/filter_smoother.jl")
+include("Estimation/irf_matching.jl")
 include("Estimation/mcmc.jl")
 include("Estimation/measurement_error.jl")
 include("Estimation/mode_finding.jl")

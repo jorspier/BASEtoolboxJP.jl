@@ -111,6 +111,8 @@ struct EstimResults
     parnames::Any
     Data::Any
     Data_missing::Any
+    IRFtargets::Any
+    IRFserrors::Any
     H_sel::Any
     priors::Any
 end

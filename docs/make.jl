@@ -10,6 +10,7 @@ makedocs(;
         "Steady state" => "SteadyState.md",
         "Perturbation solution" => "PerturbationSolution.md",
         "Estimation" => "Estimation.md",
+        "IRF Matching" => "IRF_matching.md",
         "Post estimation" => "PostEstimation.md",
         "Tools" => "Tools.md",
         "Parser" => "Parsing.md",
@@ -20,4 +21,8 @@ makedocs(;
     ),
 )
 
-deploydocs(; repo = "github.com/BASEforHANK/BASEtoolbox.jl.git", versions = nothing)
+deploydocs(;
+    repo = "github.com/BASEforHANK/BASEtoolbox.jl.git",
+    versions = nothing,
+    forcepush = true,
+)

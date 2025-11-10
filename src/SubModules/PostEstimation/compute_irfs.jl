@@ -8,6 +8,7 @@
       T = 1000,
       init_val = fill(0.01, length(exovars)),
       verbose = true,
+      irf_interval_options = nothing,
       distribution = false,
       comp_ids = nothing,
       n_par = nothing,
@@ -30,6 +31,9 @@ Computes impulse response functions (IRFs) for a given set of shocks to exogenou
   - `init_val::Vector{Float64}`: Initial value of the shock to each exogenous variable,
     defaults to 0.01 for all shocks.
   - `verbose::Bool`: Print progress to console.
+  - `irf_interval_options`: If provided, computes confidence intervals for IRFs based on
+    parameter draws. Should be a dictionary with keys `"draws"` (matrix of parameter draws)
+    and `"e_set"` (estimation settings struct).
   - `distribution::Bool`: Compute distributional IRFs, defaults to false.
   - `comp_ids`: Compression indices for the distribution, as created by
     `prepare_linearization`. Needed if `distribution` is true. Defaults to nothing.
@@ -56,6 +60,7 @@ function compute_irfs(
     T::Int64 = 1000,
     init_val::Vector{Float64} = fill(0.01, length(exovars)),
     verbose::Bool = true,
+    irf_interval_options = nothing,
     distribution::Bool = false,
     comp_ids = nothing,
     n_par = nothing,
@@ -73,12 +78,23 @@ function compute_irfs(
     # Compute the number of states and controls from gx and hx
     ncontrols = size(gx, 1)
     nstates = size(hx, 1)
+    nvars = nstates + ncontrols
 
     # Initialize IRFs for all selected exogenous variables
-    IRFs = zeros(nstates + ncontrols, T, length(exovars))
+    IRFs = zeros(nvars, T, length(exovars))
     IRFs_lvl = similar(IRFs)
     if distribution
         IRFs_dist = initialize_distributional_dict(n_par, T, length(exovars))
+    end
+
+    # Generate irf matching objects if provided -- nothing otherwise
+    if !isnothing(irf_interval_options)
+        draws_after_burnin =
+            irf_interval_options["draws"][(1 + irf_interval_options["e_set"].burnin):end, :]
+        IRF_lb = similar(IRFs)
+        IRF_ub = similar(IRFs)
+        IRF_lvl_lb = similar(IRFs)
+        IRF_lvl_ub = similar(IRFs)
     end
 
     # Store the shock names
@@ -126,6 +142,19 @@ function compute_irfs(
                 comp_ids,
                 n_par,
             )
+
+            # Computing IRFs for all parameter draws (for IRF matching)
+            if !isnothing(irf_interval_options)
+                IRF_lb[:, :, i], IRF_ub[:, :, i], IRF_lvl_lb[:, :, i], IRF_lvl_ub[:, :, i] =
+                    compute_irf_confidence_intervals(
+                        draws_after_burnin,
+                        exovars[i],
+                        init_val[i],
+                        nvars,
+                        T,
+                        irf_interval_options,
+                    )
+            end
         end
     end
 
@@ -136,10 +165,49 @@ function compute_irfs(
         )
         return IRFs, IRFs_lvl, IRFs_order, IRFs_dist
     else
-        return IRFs, IRFs_lvl, IRFs_order
+        if !isnothing(irf_interval_options)
+            return IRFs, IRFs_lvl, IRF_lb, IRF_ub, IRF_lvl_lb, IRF_lvl_ub, IRFs_order
+        else
+            return IRFs, IRFs_lvl, IRFs_order
+        end
     end
 end
 
+"""
+    initialize_distributional_dict(n_par, T, n_shocks)
+
+Create and return a dictionary of zero-initialized arrays intended for storing
+distributional impulse response functions (IRFs) and related marginal / joint objects.
+
+Parameters
+
+  - `n_par` : Model parameters struct, needed for distributional IRFs. Contains integer
+    fields `nb`, `nk`, `nh`
+
+      + `nb` = number of grid points for state `b`
+      + `nk` = number of grid points for state `k`
+      + `nh` = number of grid points for state `h`
+
+  - `T` : Integer
+
+      + Time horizon (number of periods) for the IRFs
+  - `n_shocks` : Integer
+
+      + Number of shocks for which IRFs are computed
+
+Returns
+
+  - `Dict{String,Any}` mapping descriptive names to zero-initialized arrays (Float64) with
+    shapes depending on the object:
+
+      + Base 3D objects (named `"Wb"`, `"Wk"`, `"PDF"`): (nb, nk, nh, T, n_shocks)
+      + 1D marginal objects (constructed as `"<base>_b"`, `"<base>_k"`, `"<base>_h"`):    #
+        Define the base dimensions (3D objects) (nb, T, n_shocks), (nk, T, n_shocks), (nh,
+        T, n_shocks)
+      + 2D joint objects (constructed as `"<base>_bk"`, `"<base>_bh"`, `"<base>_kh"`): (nb,
+        nk, T, n_shocks), (nb, nh, T, n_shocks), (nk, nh, T, n_shocks)    # Define the 1D
+        objects (e.g., PDF_b)
+"""
 function initialize_distributional_dict(n_par, T, n_shocks)
     # Define the base dimensions (3D objects)
     dims_3d = (n_par.nb, n_par.nk, n_par.nh, T, n_shocks)
@@ -186,22 +254,64 @@ end
 
 """
     compute_irfs_inner(
-        exovar,
-        gx,
-        hx,
-        XSS,
+        exovars::Int64,
+        gx::Matrix{Float64},
+        hx::Matrix{Float64},
+        XSS::Vector{Float64},
         ids,
-        T,
-        nstates,
-        ncontrols,
-        init_val,
-        distribution,
-        comp_ids
+        T::Int64,
+        nstates::Int64,
+        ncontrols::Int64,
+        init_val::Float64,
+        distribution::Bool,
+        comp_ids,
+        n_par,
     )
 
-Computes impulse response functions (IRFs) for a given shock to a single exogenous variable.
+Simulates impulse response functions (IRFs) for a single shock to a linear state-space
+system and reconstructs the levels for a subset of aggregate variables.
 
-See `compute_irfs` for arguments and return value descriptions.
+# Arguments
+
+  - `exovar::Int64`: Positional index of the exogenous state variable receiving the initial
+    shock.
+  - `gx::Matrix{Float64}`: Control matrix mapping states to controls (size: ncontrols ×
+    nstates).
+  - `hx::Matrix{Float64}`: State transition matrix (size: nstates × nstates).
+  - `XSS::Vector{Float64}`: Vector of steady-state values used to reconstruct levels.
+  - `ids`: A struct or other mapping object providing indices for model variables.
+
+# Keyword Arguments
+
+  - `T::Int64`: Number of periods to simulate the IRF.
+  - `nstates::Int64`: Number of state variables.
+  - `ncontrols::Int64`: Number of control variables.
+  - `init_val::Float64`: Initial value of the shock applied to the `exovar` state.
+  - `distribution::Bool`: If true, computes additional distributional IRFs.
+  - `comp_ids`: Compression indices passed to the distributional IRF routine.
+  - `n_par`: Model parameters (e.g., grid sizes) passed to the distributional IRF routine.
+
+# Returns
+
+  - If `distribution == false`, returns a tuple `(original, level)`:
+
+      + `original::Matrix{Float64}`: A matrix of IRFs in deviations from the steady state,
+        with dimensions `(nstates + ncontrols) × T`.
+      + `level::Matrix{Float64}`: A matrix of the same dimensions containing IRFs in levels
+        for aggregate variables and `NaN` otherwise.
+
+  - If `distribution == true`, returns a tuple `(original, level, dist_results)`:
+
+      + `original`, `level`: As above.
+      + `dist_results`: The dictionary of distributional IRFs returned by
+        `compute_irfs_inner_distribution`.
+
+# Notes
+
+  - This function performs a deterministic simulation of the linear system after the initial
+    shock.
+  - It relies on a globally defined `aggr_names` vector to identify which variables to
+    reconstruct in levels.
 """
 function compute_irfs_inner(
     exovar::Int64,
@@ -281,14 +391,14 @@ and Shuffle), and the IRF deviations to compute the dynamics of the entire state
   - `PDF_bk::Array{Float64,3}`, `PDF_bh::Array{Float64,3}`, `PDF_kh::Array{Float64,3}`: The
     uncompressed IRFs for the joint PDFs of liquid and illiquid assets, liquid assets and
     human capital, and illiquid assets and human capital, respectively.
-  - `Wb_b::Array{Float64,2}`, `Wb_k::Array{Float64,2}`, `Wb_h::Array{Float64,2}`, `Wk_b::Array{Float64,2}`,
-    `Wk_k::Array{Float64,2}`, `Wk_h::Array{Float64,2}`: The uncompressed IRFs for the
-    marginal value functions with respect to liquid/illiquid assets, aggregated over the
-    other two dimensions.
-  - `Wb_bk::Array{Float64,3}`, `Wb_bh::Array{Float64,3}`, `Wb_kh::Array{Float64,3}`, `Wk_bk::Array{Float64,3}`,
-    `Wk_bh::Array{Float64,3}`, `Wk_kh::Array{Float64,3}`: The uncompressed IRFs for the
-    marginal value functions with respect to liquid/illiquid assets, aggregated over
-    one dimension.
+  - `Wb_b::Array{Float64,2}`, `Wb_k::Array{Float64,2}`, `Wb_h::Array{Float64,2}`,
+    `Wk_b::Array{Float64,2}`, `Wk_k::Array{Float64,2}`, `Wk_h::Array{Float64,2}`: The
+    uncompressed IRFs for the marginal value functions with respect to liquid/illiquid
+    assets, aggregated over the other two dimensions.
+  - `Wb_bk::Array{Float64,3}`, `Wb_bh::Array{Float64,3}`, `Wb_kh::Array{Float64,3}`,
+    `Wk_bk::Array{Float64,3}`, `Wk_bh::Array{Float64,3}`, `Wk_kh::Array{Float64,3}`: The
+    uncompressed IRFs for the marginal value functions with respect to liquid/illiquid
+    assets, aggregated over one dimension.
 """
 function compute_irfs_inner_distribution(
     original::Array{Float64,2},
@@ -420,14 +530,46 @@ function compute_irfs_inner_distribution(
     return all_marginals
 end
 
+"""
+    compute_all_marginals(
+        Base_Array::AbstractArray{Float64,4},
+        Base_Name::String
+    )
+
+Computes all 1D and 2D marginal distributions of a 4D array by summing over the appropriate
+dimensions.
+
+# Arguments
+
+  - `Base_Array::AbstractArray{Float64,4}`: A 4-dimensional array with dimensions `(nb, nk, nh, T)`.
+  - `Base_Name::String`: A string prefix ("PDF" or "W") used to generate the keys in the
+    output dictionary.
+
+# Returns
+
+  - `Dict{String, AbstractArray}`: A dictionary mapping descriptive names to the computed
+    marginal arrays. For example, for `Base_Name = "PDF"`, keys include:
+
+      + `"PDF_b"`: Marginal over k and h (size: `(nb, T)`)
+      + `"PDF_k"`: Marginal over b and h (size: `(nk, T)`)
+      + `"PDF_h"`: Marginal over b and k (size: `(nh, T)`)
+      + `"PDF_bk"`: Joint over b and k (size: `(nb, nk, T)`)
+      + `"PDF_bh"`: Joint over b and h (size: `(nb, nh, T)`)
+      + `"PDF_kh"`: Joint over k and h (size: `(nk, nh, T)`)
+
+# Notes
+
+  - The function sums over the unspecified dimensions to create the marginals (e.g., for
+    `_b`, it sums over dimensions 2 and 3).
+"""
 function compute_all_marginals(Base_Array::AbstractArray{Float64,4}, Base_Name::String)
     # Base_Array is a 4D array: (nb, nk, nh, T)
 
     # Store results in a NamedTuple or Dict to be merged later
     marginals = Dict{String,AbstractArray}()
 
-    # Mapping from dimension set to the dimensions to sum over
-    # (The dims in 'sum' are the dimensions to get rid of)
+    # Mapping from dimension set to the dimensions to sum over (The dims in 'sum' are the
+    # dimensions to get rid of)
     dim_map = (
         b = (2, 3), # sum over k and h
         k = (1, 3), # sum over b and h
@@ -447,4 +589,236 @@ function compute_all_marginals(Base_Array::AbstractArray{Float64,4}, Base_Name::
     end
 
     return marginals
+end
+
+"""
+    compute_irf_confidence_intervals(
+        draws_after_burnin::Matrix{Float64},
+        exovar_idx::Int,
+        init_val::Float64,
+        n_vars::Int64,
+        T::Int64,
+        irf_interval_options
+    )
+
+Computes bootstrap-style confidence intervals for IRFs by repeatedly simulating them with
+parameter vectors sampled from a posterior distribution.
+
+# Arguments
+
+  - `draws_after_burnin::Matrix{Float64}`: Matrix of posterior draws where each row is a
+    parameter vector.
+
+  - `exovar_idx::Int`: Positional index of the exogenous variable being shocked.
+  - `init_val::Float64}`: Initial value (magnitude) of the shock.
+  - `n_vars::Int64`: Number of endogenous variables in the system.
+  - `T::Int64`: The time horizon for the IRFs.
+  - `irf_interval_options`: A dictionary or other container holding options, including:
+
+      + `n_replic::Int`: Number of bootstrap replications to run.
+      + `percentile_bounds::Vector{Float64}`: A 2-element vector with the lower and upper
+        percentile bounds (e.g., `[0.05, 0.95]`).
+
+# Returns
+
+  - `IRF_lower_bound::Matrix{Float64}`: Lower bound of the confidence interval for the IRF
+    in deviations.
+  - `IRF_upper_bound::Matrix{Float64}`: Upper bound of the confidence interval for the IRF
+    in deviations.
+  - `IRF_lvl_lower_bound::Matrix{Float64}`: Lower bound for the IRF in levels.
+  - `IRF_lvl_upper_bound::Matrix{Float64}`: Upper bound for the IRF in levels.
+"""
+function compute_irf_confidence_intervals(
+    draws_after_burnin::Matrix{Float64},
+    exovar_idx::Int,
+    init_val::Float64,
+    n_vars::Int64,
+    T::Int64,
+    irf_interval_options,
+)
+
+    # Params
+    n_replic = irf_interval_options["n_replic"]
+    percentile_bounds = irf_interval_options["percentile_bounds"]
+
+    # Draws
+    rand_draws = rand(1:size(draws_after_burnin, 1), n_replic)
+
+    # Pre-allocate
+    IRF_draws_3d = Array{Float64,3}(undef, n_vars, T, n_replic)
+    IRF_draws_lvl_3d = Array{Float64,3}(undef, n_vars, T, n_replic)
+
+    # Loop through the rest of the sampled draws and compute IRFs
+    for j = 1:n_replic
+        idx = rand_draws[j]
+        param_draw = draws_after_burnin[idx, :]
+
+        # Compute the IRF for this specific parameter draw
+        IRF_draws_3d[:, :, j], IRF_draws_lvl_3d[:, :, j] = compute_irf_given_param_draw(
+            exovar_idx,
+            init_val,
+            param_draw,
+            T,
+            irf_interval_options,
+        )
+    end
+
+    # Compute the quantiles
+    IRF_lower_bound = compute_nanquantile_matrix(IRF_draws_3d, percentile_bounds[1])
+    IRF_lvl_lower_bound = compute_nanquantile_matrix(IRF_draws_lvl_3d, percentile_bounds[1])
+    IRF_upper_bound = compute_nanquantile_matrix(IRF_draws_3d, percentile_bounds[2])
+    IRF_lvl_upper_bound = compute_nanquantile_matrix(IRF_draws_lvl_3d, percentile_bounds[2])
+    # 6. Package and return the results
+    return IRF_lower_bound, IRF_upper_bound, IRF_lvl_lower_bound, IRF_lvl_upper_bound
+end
+
+"""
+    compute_nanquantile_matrix(b::AbstractArray{Float64, 3}, p::Real)
+
+Computes the quantile for each vector slice of a 3D array along the third dimension,
+robustly handling `NaN` values.
+
+# Arguments
+
+  - `b::AbstractArray{Float64, 3}`: A 3D array of data, typically with dimensions
+    `(variables, time_periods, draws)`.
+  - `p::Real`: The quantile to compute (e.g., 0.05 for the 5th percentile).
+
+# Returns
+
+  - `w::Matrix{Float64}`: A 2D matrix of shape `(variables, time_periods)` containing the
+    computed quantiles for each slice.
+
+# Notes
+
+  - If all values in a vector slice `b[i, j, :]` are `NaN`, the resulting quantile for that
+    element `w[i, j]` will also be `NaN`.
+"""
+function compute_nanquantile_matrix(b, p)
+    w = Matrix{Float64}(undef, size(b, 1), size(b, 2))
+    # 2. Loop through each column of the matrix
+    for j in axes(b, 2)
+        # 3. Loop through each row of the matrix
+        for i in axes(b, 1)
+            # For the current (i, j) position, grab the vector of all draws across the 3rd
+            # dimension
+            slice_of_draws = b[i, j, :]
+
+            # Filter out any NaN values from that vector
+            filtered_slice = filter(!isnan, slice_of_draws)
+
+            # Check if the filtered vector is now empty. If it is, the result is NaN.
+            # Otherwise, calculate the quantile.
+            if isempty(filtered_slice)
+                result = NaN
+            else
+                result = quantile(filtered_slice, p)
+            end
+
+            # Store the final result in our output matrix
+            w[i, j] = result
+        end
+    end
+    return w
+end
+
+"""
+    compute_irf_given_param_draw(
+        exovar,
+        init_val,
+        param_draw,
+        T,
+        irf_interval_options
+    )
+
+Computes the impulse response function (IRF) for a single draw of model parameters.
+
+This is a helper function typically used within a bootstrap or MCMC loop for generating
+confidence intervals.
+
+# Arguments
+
+  - `exovar::Int`: Index of the exogenous variable receiving the shock.
+
+  - `init_val::Float64`: Initial value (magnitude) of the shock.
+  - `param_draw::Vector{Float64}`: A vector containing a single draw of the model's free
+    parameters.
+  - `T::Int`: The time horizon for the IRF.
+  - `irf_interval_options`: A dictionary or other container with required objects:
+
+      + `"sr"`: The steady-state results object.
+      + `"lr"`: The linear results object from the model solution.
+      + `"m_par"`: A `Flatten` object for reconstructing parameter structs.
+      + `"e_set"`: A settings object, especially for handling measurement error.
+
+# Returns
+
+  - A tuple `(IRFs, IRFs_lvl)`:
+
+      + `IRFs::Matrix{Float64}`: The IRF in deviations from steady state.
+      + `IRFs_lvl::Matrix{Float64}`: The IRF in levels.
+
+# Notes
+
+  - This function creates a local copy of the linear results (`lr`) before calling
+    `update_model` to avoid mutating the original object.
+  - Distributional IRFs are currently hardcoded to `false` within this function.
+"""
+function compute_irf_given_param_draw(exovar, init_val, param_draw, T, irf_interval_options)
+    sr = irf_interval_options["sr"]
+    lr = irf_interval_options["lr"]
+    m_par = irf_interval_options["m_par"]
+    e_set = irf_interval_options["e_set"]
+
+    # Reconstruct model parameters
+    if e_set.me_treatment != :fixed
+        m_par_local = Flatten.reconstruct(
+            m_par,
+            param_draw[1:(length(param_draw) - length(e_set.meas_error_input))],
+        )
+    else
+        m_par_local = Flatten.reconstruct(m_par, param_draw)
+    end
+
+    # Necessary since update_model modifies lr in-place
+    A = lr.A
+    B = lr.B
+    State2Control = lr.State2Control
+    LOMstate = lr.LOMstate
+    SolutionError = lr.SolutionError
+    nk = lr.nk
+
+    lr_local = LinearResults(
+        copy(State2Control),
+        copy(LOMstate),
+        copy(A),
+        copy(B),
+        copy(SolutionError),
+        copy(nk),
+    )
+
+    lr_reduc = update_model(sr, lr_local, m_par_local)
+    nstates = size(lr_reduc.LOMstate, 1)
+    ncontrols = size(lr_reduc.State2Control, 1)
+
+    # TODO: Hardcoded, assuming not matching distributional IRFs
+    distribution = false
+    comp_ids = nothing
+    n_par = nothing
+
+    IRFs, IRFs_lvl = compute_irfs_inner(
+        exovar,
+        lr_reduc.State2Control,
+        lr_reduc.LOMstate,
+        sr.XSS,
+        sr.indexes_r,
+        T,
+        nstates,
+        ncontrols,
+        init_val,
+        distribution,
+        comp_ids,
+        n_par,
+    )
+    return IRFs, IRFs_lvl
 end

@@ -5,6 +5,9 @@
         IRFs_to_plot,
         IRFs_order,
         ids;
+        intervals = false,
+        e_set = nothing,
+        plot_data_irfs::Bool = false,
         horizon = 40,
         factor = 100,
         legend_on_all = false,
@@ -36,6 +39,10 @@ IRFs as produced by `compute_irfs`.
 
 # Keyword Arguments
 
+  - `intervals::Vector{Tuple}`: A vector of tuples, each tuple for each model specified. Each tuple contains the lower and upper bounds for the IRFs. Default is false (no intervals plotted).
+  - `e_set::BASEforHANK.EconSet`: An economic settings object containing relevant data and configurations. Needed for IRF matching plots.
+  - `plot_data_irfs::Bool`: If `true`, overlays empirical IRFs from data on the plots.
+    Default is `false`.
   - `horizon::Int64`: The time horizon (number of periods) over which IRFs are plotted.
     Default is `40`.
   - `factor::Int64`: Scaling factor for the IRFs (default: `100`).
@@ -64,6 +71,9 @@ function plot_irfs(
     IRFs_to_plot::Vector{Tuple{Array{Float64,3},String}},
     IRFs_order::Vector{Symbol},
     ids;
+    intervals = false,
+    e_set = nothing,
+    plot_data_irfs::Bool = false,
     horizon::Int64 = 40,
     factor::Int64 = 100,
     legend_on_all::Bool = false,
@@ -75,6 +85,9 @@ function plot_irfs(
     yscale::Union{String,Tuple{Number,Number},Dict{Symbol,Tuple{Number,Number}}} = "standard",
     style_options::NamedTuple = (lw = 2, color = :auto, linestyle = :solid),
 )
+    if plot_data_irfs && isnothing(e_set)
+        error("`e_set` must be provided when `plot_data_irfs` is true.")
+    end
 
     # General stylistic choices for the plots
     pp_layout = (
@@ -138,8 +151,22 @@ function plot_irfs(
 
         # Extract IRFs for this shock, round to 10 digits, and multiply by factor
         i_IRFs = fill(NaN64, ntotal, T, n_IRFs)
+
         for i = 1:n_IRFs
             i_IRFs[:, :, i] = mapround(IRFs_to_plot[i][1][:, :, idx]; digits = 10) .* factor
+        end
+
+        # Intervals
+        if intervals != false
+            i_IRFs_lb = fill(NaN64, ntotal, T, n_IRFs)
+            i_IRFs_ub = fill(NaN64, ntotal, T, n_IRFs)
+
+            for i = 1:n_IRFs
+                i_IRFs_lb[:, :, i] =
+                    mapround(intervals[i][1][:, :, idx]; digits = 10) .* factor
+                i_IRFs_ub[:, :, i] =
+                    mapround(intervals[i][2][:, :, idx]; digits = 10) .* factor
+            end
         end
 
         # Extract the variables to plot and their labels
@@ -169,14 +196,53 @@ function plot_irfs(
         for (i, (var, lab)) in enumerate(zip(i_vars, i_labs))
             if hasfield(typeof(ids), var)
                 var_idx = getfield(ids, var)
+                i_irf(x) = i_IRFs[var_idx, 1:horizon, x]
+
                 p = plot(
-                    i_IRFs[var_idx, 1:horizon, 1];
+                    i_irf(1);
                     title = lab,
                     label = IRFs_to_plot[1][2],
                     lw = pp_layout.lw,
                     color = effective_color[1],
                     linestyle = effective_linestyle[1],
                 )
+                if intervals != false
+                    plot!(
+                        p,
+                        i_IRFs_lb[var_idx, 1:horizon, 1];
+                        fillrange = i_IRFs_ub[var_idx, 1:horizon, 1],
+                        color = effective_color[1],
+                        alpha = 0.2,
+                        label = "",
+                    )
+                end
+                if plot_data_irfs
+                    try
+                        data_irfs = get_data_irfs(var, i_shock, e_set)
+                        plot!(
+                            p,
+                            axes(data_irfs.d_data, 1),
+                            data_irfs.l_data .* factor;
+                            fillrange = data_irfs.u_data .* factor,
+                            alpha = 0.2,
+                            color = :black,
+                            label = "",
+                            linewidth = 0,
+                        )
+                        plot!(
+                            p,
+                            axes(data_irfs.d_data, 1),
+                            data_irfs.d_data .* factor;
+                            label = "Data",
+                            color = :black,
+                            linewidth = 2,
+                            linestyle = :dash,
+                        )
+                    catch e
+                        @warn "Could not plot data IRF for var=$var, shock=$i_shock. Reason: $e"
+                    end
+                end
+
                 for j = 2:n_IRFs # Code to handle color vector for multiple IRFs
                     plot!(
                         p,
@@ -186,6 +252,42 @@ function plot_irfs(
                         color = effective_color[j],
                         linestyle = effective_linestyle[j],
                     )
+                    if intervals != false
+                        plot!(
+                            p,
+                            i_IRFs_lb[var_idx, 1:horizon, j];
+                            fillrange = i_IRFs_ub[var_idx, 1:horizon, j],
+                            color = effective_color[j],
+                            alpha = 0.2,
+                            label = "",
+                        )
+                    end
+                    if plot_data_irfs
+                        try
+                            data_irfs = get_data_irfs(var, i_shock, e_set)
+                            plot!(
+                                p,
+                                axes(data_irfs.d_data, 1),
+                                data_irfs.l_data .* factor;
+                                fillrange = data_irfs.u_data .* factor,
+                                alpha = 0.2,
+                                color = :black,
+                                label = "",
+                                linewidth = 0,
+                            )
+                            plot!(
+                                p,
+                                axes(data_irfs.d_data, 1),
+                                data_irfs.d_data .* factor;
+                                label = "Data",
+                                color = :black,
+                                linewidth = 2,
+                                linestyle = :dash,
+                            )
+                        catch e
+                            @warn "Could not plot data IRF for var=$var, shock=$i_shock. Reason: $e"
+                        end
+                    end
                 end
                 if i > 1 && !legend_on_all
                     p = plot!(p; legend = false)
@@ -239,4 +341,52 @@ function plot_irfs(
             display(fig)
         end
     end
+end
+
+"""
+    get_data_irfs(var, shock, e_set)
+
+Loads, cleans, and scales the empirical IRF data for a single variable and shock.
+
+# Returns
+
+A NamedTuple `(d_data, l_data, u_data)` containing the point estimate, lower bound,
+and upper bound of the data IRF.
+"""
+function get_data_irfs(var, shock, e_set)
+
+    # Import data IRFs (This could be cached for efficiency)
+    irf_data_path = e_set.irf_matching_dict["irfs_to_plot"]
+    IRFs_data = DataFrame(CSV.File(irf_data_path; missingstring = "NaN"))
+
+    # Rename observables to match model names
+    for col_name in Symbol.(names(IRFs_data))
+        name_temp = get(e_set.data_rename, col_name, :none)
+        if name_temp != :none
+            rename!(IRFs_data, Dict(col_name => name_temp))
+        end
+    end
+
+    # Extract point estimates and standard errors for the specific shock and variable
+    horizon = e_set.irf_matching_dict["irf_horizon"]
+    βₕ = filter(x -> x.shock == String(shock) && x.pointdum == 1, IRFs_data)[1:horizon, var]
+    seₕ =
+        filter(x -> x.shock == String(shock) && x.pointdum == 0, IRFs_data)[1:horizon, var]
+
+    # Determine scaling factor
+    var_to_scale_by = e_set.irf_matching_dict["scale_responses_by"]
+    peak_var = 1.0
+    if var_to_scale_by !== nothing
+        peak_vals = filter(x -> x.shock == String(shock) && x.pointdum == 1, IRFs_data)[
+            :,
+            var_to_scale_by,
+        ]
+        peak_var = isempty(peak_vals) ? 1.0 : maximum(peak_vals)
+    end
+
+    # Calculate series
+    d_data = βₕ ./ peak_var
+    l_data = d_data .- 1.6449 .* seₕ ./ peak_var
+    u_data = d_data .+ 1.6449 .* seₕ ./ peak_var
+    return (d_data = d_data, l_data = l_data, u_data = u_data)
 end

@@ -305,20 +305,26 @@ Use package `Parameters` to provide initial values. Input and output file names 
 in the fields `mode_start_file`, `data_file`, `save_mode_file` and `save_posterior_file`.
 """
 @with_kw struct EstimationSettings
+    # IRF matching
+    irf_matching::Bool = false
+    irf_matching_dict::Dict = Dict()
+
     shock_names::Array{Symbol,1} = shock_names # set in Model/input_aggregate_names.jl
-    observed_vars_input::Array{Symbol,1} = [
-        :Ygrowth,
-        :Igrowth,
-        :Cgrowth,
-        :N,
-        :wgrowth,
-        :RB,
-        :π,
-        :TOP10Wshare,
-        :TOP10Ishare,
-        :τprog,
-        :σ,
-    ]
+    observed_vars_input::Array{Symbol,1} =
+        irf_matching ? [:G, :Y, :B, :I, :LPXA] :
+        [
+            :Ygrowth,
+            :Igrowth,
+            :Cgrowth,
+            :N,
+            :wgrowth,
+            :RB,
+            :π,
+            :TOP10Wshare,
+            :TOP10Ishare,
+            :τprog,
+            :σ,
+        ]
 
     nobservables = length(observed_vars_input)
 
@@ -333,8 +339,9 @@ in the fields `mode_start_file`, `data_file`, `save_mode_file` and `save_posteri
     me_treatment::Symbol = :unbounded
     me_std_cutoff::Float64 = 0.2
 
-    meas_error_input::Array{Symbol,1} = [:TOP10Wshare, :TOP10Ishare]
+    meas_error_input::Array{Symbol,1} = irf_matching ? [] : [:TOP10Wshare, :TOP10Ishare]
     meas_error_distr::Array{InverseGamma{Float64},1} =
+        irf_matching ? [] :
         [InverseGamma(ig_pars(0.01, 0.01^2)...), InverseGamma(ig_pars(0.01, 0.01^2)...)]
 
     # Leave empty to start with prior mode

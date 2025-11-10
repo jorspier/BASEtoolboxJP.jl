@@ -15,7 +15,8 @@ using LinearAlgebra,
     Random,
     FieldMetadata,
     MCMCChains,
-    Printf
+    Printf,
+    Logging
 
 # Documentation: if paths to model are not defined, the code will use the baseline example.
 if !isdefined(Main, :paths)
@@ -28,6 +29,8 @@ import Flatten: flattenable
 include("SubModules/Types.jl")
 using .Types
 include("SubModules/Tools.jl")
+include("SubModules/LoggingTools.jl")
+using .LoggingTools
 
 # Submodules that define functions used by parent
 include("SubModules/Parsing.jl")
@@ -307,6 +310,8 @@ function find_mode(
     parnames,
     Data,
     Data_missing,
+    IRFtargets,
+    IRFserrors,
     H_sel,
     priors,
     smoother_output,
@@ -324,6 +329,8 @@ function find_mode(
         parnames,
         Data,
         Data_missing,
+        IRFtargets,
+        IRFserrors,
         H_sel,
         priors,
     )
@@ -413,20 +420,37 @@ function sample_posterior(
 
     lr = update_model(sr, lr, m_par)
 
-    smoother_output = likeli(par_final, sr, lr, er, m_par, e_set; smoother = true)
+    if !e_set.irf_matching
+        smoother_output = likeli(par_final, sr, lr, er, m_par, e_set; smoother = true)
 
-    @printf "Started MCMC. This might take a while... Done.\n"
+        @printf "Started MCMC. This might take a while... Done.\n"
 
-    return sr,
-    lr,
-    er,
-    m_par,
-    draws_raw,
-    posterior,
-    accept_rate,
-    par_final,
-    hessian_sym,
-    smoother_output
+        return sr,
+        lr,
+        er,
+        m_par,
+        draws_raw,
+        posterior,
+        accept_rate,
+        par_final,
+        hessian_sym,
+        smoother_output
+    else
+        smoother_output = []
+
+        @printf "Started MCMC. This might take a while... Done.\n"
+
+        return sr,
+        lr,
+        er,
+        m_par,
+        draws_raw,
+        posterior,
+        accept_rate,
+        par_final,
+        hessian_sym,
+        smoother_output
+    end
 end
 
 end

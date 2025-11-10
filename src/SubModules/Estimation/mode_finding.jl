@@ -19,170 +19,190 @@ Save estimation results to `e_set.save_mode_file`.
 - `smoother_output`: output from the Kalman smoother
 """
 function mode_finding(sr, lr, m_par, e_set, par_start)
+    if !e_set.irf_matching # No irf matching? => likelihood estimation
+        # Load data
+        Data_temp = DataFrame(CSV.File(e_set.data_file; missingstring = "NaN"))
+        data_names_temp = propertynames(Data_temp)
 
-    # Load data
-    Data_temp = DataFrame(CSV.File(e_set.data_file; missingstring = "NaN"))
-    data_names_temp = propertynames(Data_temp)
-
-    # Rename observables that do not have matching model names
-    for i in data_names_temp
-        name_temp = get(e_set.data_rename, i, :none)
-        if name_temp != :none
-            rename!(Data_temp, Dict(i => name_temp))
+        # Rename observables that do not have matching model names
+        for i in data_names_temp
+            name_temp = get(e_set.data_rename, i, :none)
+            if name_temp != :none
+                rename!(Data_temp, Dict(i => name_temp))
+            end
         end
-    end
 
-    # Identify missing observations
-    observed_vars = e_set.observed_vars_input
-    Data = Matrix(Data_temp[:, observed_vars])
-    Data_missing = ismissing.(Data)
+        # Identify missing observations
+        observed_vars = e_set.observed_vars_input
+        Data = Matrix(Data_temp[:, observed_vars])
+        Data_missing = ismissing.(Data)
 
-    # Built selection matrix
-    H_sel = zeros(e_set.nobservables, sr.n_par.nstates_r + sr.n_par.ncontrols_r)
-    for i in eachindex(observed_vars)
-        H_sel[i, getfield(sr.indexes_r, (observed_vars[i]))] = 1.0
-    end
-
-    # get names of estimated parameters and add measurement error params
-    parnames = collect(fieldnameflatten(m_par))
-    if e_set.me_treatment != :fixed
-        for i in eachindex(e_set.meas_error_input)
-            push!(parnames, Symbol(:σ_me_, e_set.meas_error_input[i]))
+        # Built selection matrix
+        H_sel = zeros(e_set.nobservables, sr.n_par.nstates_r + sr.n_par.ncontrols_r)
+        for i in eachindex(observed_vars)
+            H_sel[i, getfield(sr.indexes_r, (observed_vars[i]))] = 1.0
         end
-    end
 
-    # Set up measurement error
-    meas_error, meas_error_prior, meas_error_std =
-        measurement_error(Data, observed_vars, e_set)
+        # get names of estimated parameters and add measurement error params
+        parnames = collect(fieldnameflatten(m_par))
+        if e_set.me_treatment != :fixed
+            for i in eachindex(e_set.meas_error_input)
+                push!(parnames, Symbol(:σ_me_, e_set.meas_error_input[i]))
+            end
+        end
 
-    # initialize parameters at starting values
-    par = copy(par_start)
+        # Set up measurement error
+        meas_error, meas_error_prior, meas_error_std =
+            measurement_error(Data, observed_vars, e_set)
 
-    if e_set.me_treatment != :fixed
-        m_par = Flatten.reconstruct(m_par, par[1:(length(par) - length(meas_error))])
-    else
-        m_par = Flatten.reconstruct(m_par, par)
-    end
+        # initialize parameters at starting values
+        par = copy(par_start)
 
-    # Prior specification
-    priors = collect(metaflatten(m_par, prior)) # model parameters
-    if e_set.me_treatment != :fixed
-        append!(priors, meas_error_prior)          # add the meas. error priors
-    end
+        if e_set.me_treatment != :fixed
+            m_par = Flatten.reconstruct(m_par, par[1:(length(par) - length(meas_error))])
+        else
+            m_par = Flatten.reconstruct(m_par, par)
+        end
 
-    # Optimization
-    # Define objective function
-    Laux(pp) =
-        -likeli(
-            pp,
-            Data,
-            Data_missing,
-            H_sel,
-            priors,
-            meas_error,
-            meas_error_std,
-            sr,
-            lr,
-            m_par,
-            e_set,
-        )[3]
+        # Prior specification
+        priors = collect(metaflatten(m_par, prior)) # model parameters
+        if e_set.me_treatment != :fixed
+            append!(priors, meas_error_prior)          # add the meas. error priors
+        end
 
-    # Code variant with box-constrained optimization, used for updating compression
-    OptOpt = Optim.Options(;
-        show_trace = true,
-        show_every = 20,
-        store_trace = true,
-        x_abstol = e_set.x_tol,
-        f_reltol = e_set.f_tol,
-        iterations = div(e_set.max_iter_mode, 3),
-    )
-    opti = optimize(Laux, par, e_set.optimizer, OptOpt)
+        # Optimization
+        # Define objective function
+        Laux(pp) =
+            -likeli(
+                pp,
+                Data,
+                Data_missing,
+                H_sel,
+                priors,
+                meas_error,
+                meas_error_std,
+                sr,
+                lr,
+                m_par,
+                e_set,
+            )[3]
 
-    par_final = Optim.minimizer(opti)
-    # Update estimated model parameters and resolve model
-    if e_set.me_treatment != :fixed
-        m_par = Flatten.reconstruct(
-            m_par,
-            par_final[1:(length(par_final) - length(meas_error))],
+        # Code variant with box-constrained optimization, used for updating compression
+        OptOpt = Optim.Options(;
+            show_trace = true,
+            show_every = 20,
+            store_trace = true,
+            x_abstol = e_set.x_tol,
+            f_reltol = e_set.f_tol,
+            iterations = div(e_set.max_iter_mode, 3),
         )
-    else
-        m_par = Flatten.reconstruct(m_par, par_final)
-    end
-    if sr.n_par.verbose
-        @printf "Updating model reduction after initial optimization.\n"
-    end
-    @set! sr.n_par.further_compress = false
-    sr_aux = model_reduction(sr, lr, m_par) # revert to full model
-    lr_aux = update_model(sr_aux, lr, m_par) # solve full model
-    @set! sr_aux.n_par.further_compress = true
-    sr = model_reduction(sr_aux, lr_aux, m_par) # update model reduction
-    lr = update_model(sr, lr_aux, m_par)   # solve new reduced model
+        opti = optimize(Laux, par, e_set.optimizer, OptOpt)
 
-    # Built selection matrix
-    H_sel = zeros(e_set.nobservables, sr.n_par.nstates_r + sr.n_par.ncontrols_r)
-    for i in eachindex(observed_vars)
-        H_sel[i, getfield(sr.indexes_r, (observed_vars[i]))] = 1.0
-    end
+        par_final = Optim.minimizer(opti)
+        # Update estimated model parameters and resolve model
+        if e_set.me_treatment != :fixed
+            m_par = Flatten.reconstruct(
+                m_par,
+                par_final[1:(length(par_final) - length(meas_error))],
+            )
+        else
+            m_par = Flatten.reconstruct(m_par, par_final)
+        end
+        if sr.n_par.verbose
+            @printf "Updating model reduction after initial optimization.\n"
+        end
+        @set! sr.n_par.further_compress = false
+        sr_aux = model_reduction(sr, lr, m_par) # revert to full model
+        lr_aux = update_model(sr_aux, lr, m_par) # solve full model
+        @set! sr_aux.n_par.further_compress = true
+        sr = model_reduction(sr_aux, lr_aux, m_par) # update model reduction
+        lr = update_model(sr, lr_aux, m_par)   # solve new reduced model
 
-    # Redefine objective function
-    LL(pp) =
-        -likeli(
-            pp,
-            Data,
-            Data_missing,
-            H_sel,
-            priors,
-            meas_error,
-            meas_error_std,
-            sr,
-            lr,
-            m_par,
-            e_set,
-        )[3]
+        # Built selection matrix
+        H_sel = zeros(e_set.nobservables, sr.n_par.nstates_r + sr.n_par.ncontrols_r)
+        for i in eachindex(observed_vars)
+            H_sel[i, getfield(sr.indexes_r, (observed_vars[i]))] = 1.0
+        end
 
-    OptOpt = Optim.Options(;
-        show_trace = true,
-        show_every = 20,
-        store_trace = true,
-        x_abstol = e_set.x_tol,
-        f_reltol = e_set.f_tol,
-        iterations = div(e_set.max_iter_mode, 3) * 2,
-    )
-    opti = optimize(LL, Optim.minimizer(opti), e_set.optimizer, OptOpt)
-    par_final = Optim.minimizer(opti)
+        # Redefine objective function
+        LL(pp) =
+            -likeli(
+                pp,
+                Data,
+                Data_missing,
+                H_sel,
+                priors,
+                meas_error,
+                meas_error_std,
+                sr,
+                lr,
+                m_par,
+                e_set,
+            )[3]
 
-    # Update estimated model parameters and resolve model
-    if e_set.me_treatment != :fixed
-        m_par = Flatten.reconstruct(
-            m_par,
-            par_final[1:(length(par_final) - length(meas_error))],
+        OptOpt = Optim.Options(;
+            show_trace = true,
+            show_every = 20,
+            store_trace = true,
+            x_abstol = e_set.x_tol,
+            f_reltol = e_set.f_tol,
+            iterations = div(e_set.max_iter_mode, 3) * 2,
         )
-    else
-        m_par = Flatten.reconstruct(m_par, par_final)
-    end
-    ll_old = -Optim.minimum(opti)
+        opti = optimize(LL, Optim.minimizer(opti), e_set.optimizer, OptOpt)
+        par_final = Optim.minimizer(opti)
 
-    if sr.n_par.verbose
-        @printf "Updating model reduction after mode finding finished.\n"
-    end
-    @set! sr.n_par.further_compress = false
-    sr_aux = model_reduction(sr, lr, m_par) # revert to full model
-    lr_aux = update_model(sr_aux, lr, m_par) # solve full model
-    if sr.n_par.verbose
-        @printf "New reduction.\n"
-    end
-    @set! sr_aux.n_par.further_compress = true
-    sr = model_reduction(sr_aux, lr_aux, m_par) # update model reduction
-    lr = update_model(sr, lr_aux, m_par)   # solve new reduced model
-    # Built selection matrix
-    H_sel = zeros(e_set.nobservables, sr.n_par.nstates_r + sr.n_par.ncontrols_r)
-    for i in eachindex(observed_vars)
-        H_sel[i, getfield(sr.indexes_r, (observed_vars[i]))] = 1.0
-    end
+        # Update estimated model parameters and resolve model
+        if e_set.me_treatment != :fixed
+            m_par = Flatten.reconstruct(
+                m_par,
+                par_final[1:(length(par_final) - length(meas_error))],
+            )
+        else
+            m_par = Flatten.reconstruct(m_par, par_final)
+        end
+        ll_old = -Optim.minimum(opti)
 
-    LL_final(pp) =
-        -likeli(
-            pp,
+        if sr.n_par.verbose
+            @printf "Updating model reduction after mode finding finished.\n"
+        end
+        @set! sr.n_par.further_compress = false
+        sr_aux = model_reduction(sr, lr, m_par) # revert to full model
+        lr_aux = update_model(sr_aux, lr, m_par) # solve full model
+        if sr.n_par.verbose
+            @printf "New reduction.\n"
+        end
+        @set! sr_aux.n_par.further_compress = true
+        sr = model_reduction(sr_aux, lr_aux, m_par) # update model reduction
+        lr = update_model(sr, lr_aux, m_par)   # solve new reduced model
+        # Built selection matrix
+        H_sel = zeros(e_set.nobservables, sr.n_par.nstates_r + sr.n_par.ncontrols_r)
+        for i in eachindex(observed_vars)
+            H_sel[i, getfield(sr.indexes_r, (observed_vars[i]))] = 1.0
+        end
+
+        LL_final(pp) =
+            -likeli(
+                pp,
+                Data,
+                Data_missing,
+                H_sel,
+                priors,
+                meas_error,
+                meas_error_std,
+                sr,
+                lr,
+                m_par,
+                e_set,
+            )[3]
+
+        posterior_mode = -LL_final(par_final)
+        if sr.n_par.verbose
+            @printf "Likelihood at mode under reduction: old: %f new: %f\n" ll_old posterior_mode
+        end
+
+        # Run Kalman smoother
+        smoother_output = likeli(
+            par_final,
             Data,
             Data_missing,
             H_sel,
@@ -192,55 +212,260 @@ function mode_finding(sr, lr, m_par, e_set, par_start)
             sr,
             lr,
             m_par,
-            e_set,
-        )[3]
+            e_set;
+            smoother = true,
+        )
 
-    posterior_mode = -LL_final(par_final)
-    if sr.n_par.verbose
-        @printf "Likelihood at mode under reduction: old: %f new: %f\n" ll_old posterior_mode
-    end
+        # Compute Hessian at posterior mode
+        if e_set.compute_hessian == true
+            if sr.n_par.verbose
+                @printf "Computing Hessian. This might take a while...\n"
+            end
+            hessian_final =
+                FiniteDiff.finite_difference_hessian(LL_final, par_final; relstep = 0.001)
+        else
+            if sr.n_par.verbose
+                @printf "Assuming Hessian is I...\n"
+            end
+            hessian_final = Matrix{Float64}(I, length(par_final), length(par_final))
+        end
 
-    # Run Kalman smoother
-    smoother_output = likeli(
-        par_final,
-        Data,
-        Data_missing,
-        H_sel,
-        priors,
+        # For IRF matching, but we do not use it here
+        IRFtargets = []
+        IRFserrors = []
+
+        return par_final,
+        hessian_final,
+        posterior_mode,
         meas_error,
         meas_error_std,
-        sr,
-        lr,
+        parnames,
+        Data,
+        Data_missing,
+        IRFtargets,
+        IRFserrors,
+        H_sel,
+        priors,
+        smoother_output,
         m_par,
-        e_set;
-        smoother = true,
-    )
+        sr,
+        lr
 
-    # Compute Hessian at posterior mode
-    if e_set.compute_hessian == true
+    elseif e_set.irf_matching # irf matching? => irf matching estimation
         if sr.n_par.verbose
-            @printf "Computing Hessian. This might take a while...\n"
+            @printf "IRF matching...\n"
         end
-        hessian_final = FiniteDiff.finite_difference_hessian(LL, par_final; relstep = 0.001)
+
+        # initialize parameters at starting values
+        par = copy(par_start) #[1:(end - length(e_set.meas_error_distr))]
+
+        parnames = collect(fieldnameflatten(m_par))
+
+        # Prior specification
+        priors = collect(metaflatten(m_par, prior)) # model parameters
+
+        irf_horizon = e_set.irf_matching_dict["irf_horizon"]
+
+        # Load irf targets
+        key_to_use =
+            haskey(e_set.irf_matching_dict, "irfs_to_target") ? "irfs_to_target" :
+            "irfs_to_plot"
+
+        Data_temp =
+            DataFrame(CSV.File(e_set.irf_matching_dict[key_to_use]; missingstring = "NaN"))
+        shock_names = Symbol.(unique(Data_temp[:, :shock]))
+
+        data_names_temp = Symbol.(names(Data_temp))
+
+        # Rename observables that do not have matching model names
+        for i in data_names_temp
+            name_temp = get(e_set.data_rename, i, :none)
+            if name_temp != :none
+                rename!(Data_temp, Dict(i => name_temp))
+            end
+        end
+
+        shocks_selected = intersect(shock_names, e_set.shock_names)
+        select_variables =
+            intersect(Symbol.(propertynames(Data_temp)), e_set.observed_vars_input)
+
+        IRFtargets = Array{Float64}(
+            undef,
+            irf_horizon,
+            length(select_variables),
+            length(shocks_selected),
+        )
+        IRFserrors = Array{Float64}(
+            undef,
+            irf_horizon,
+            length(select_variables),
+            length(shocks_selected),
+        )
+
+        counti = 0
+        for i in shocks_selected
+            counti += 1
+            countj = 0
+            for j in select_variables
+                countj += 1
+                IRFtargets[:, countj, counti] = Data_temp[
+                    (Data_temp[
+                        :,
+                        :pointdum,
+                    ] .== 1) .& (Symbol.(Data_temp[:, :shock]) .== i),
+                    j,
+                ]
+                IRFserrors[:, countj, counti] = Data_temp[
+                    (Data_temp[
+                        :,
+                        :pointdum,
+                    ] .== 0) .& (Symbol.(Data_temp[:, :shock]) .== i),
+                    j,
+                ]
+            end
+        end
+        var_to_scale_by = e_set.irf_matching_dict["scale_responses_by"]
+        scale_term =
+            var_to_scale_by === nothing ? 1 : maximum(Data_temp[:, var_to_scale_by])
+
+        IRFtargets = IRFtargets ./ scale_term
+        IRFserrors = IRFserrors ./ scale_term
+
+        weights = 1.0 ./ (IRFserrors .^ 2)
+        iter = 1
+        indexes_sel_vars = []
+        isstate = zeros(Bool, length(select_variables))
+        for i in select_variables
+            if i in Symbol.(sr.state_names)
+                isstate[iter] = true
+            end
+            iter += 1
+            append!(indexes_sel_vars, getfield(sr.indexes_r, i))
+        end
+
+        m_par = Flatten.reconstruct(m_par, par)
+
+        # Optimization
+        # Define objective function
+        Lirfaux(pp) =
+            -irfmatch(
+                pp,
+                IRFtargets,
+                weights,
+                shocks_selected,
+                isstate,
+                indexes_sel_vars,
+                priors,
+                sr,
+                lr,
+                m_par,
+                e_set,
+            )[3]
+
+        OptOpt = Optim.Options(;
+            show_trace = true,
+            show_every = 20,
+            store_trace = true,
+            x_abstol = e_set.x_tol,
+            f_reltol = e_set.f_tol,
+            iterations = e_set.max_iter_mode,
+        )
+
+        opti = optimize(
+            Lirfaux,
+            par_start, # [1:(end - length(e_set.meas_error_distr))],
+            e_set.optimizer,
+            OptOpt,
+        )
+        par_final = Optim.minimizer(opti)
+
+        m_par = Flatten.reconstruct(m_par, par_final)
+        # ll_old = -Optim.minimum(opti)
+
+        if sr.n_par.verbose
+            @printf "Updating model reduction after initial optimization.\n"
+        end
+        @set! sr.n_par.further_compress = false
+        sr_aux = model_reduction(sr, lr, m_par) # revert to full model
+        lr_aux = update_model(sr_aux, lr, m_par) # solve full model
+
+        if sr.n_par.verbose
+            @printf "New reduction.\n"
+        end
+        @set! sr_aux.n_par.further_compress = true
+        sr = model_reduction(sr_aux, lr_aux, m_par) # update model reduction
+        lr = update_model(sr, lr_aux, m_par)   # solve new reduced model
+
+        iter = 1
+        indexes_sel_vars = []
+        isstate = zeros(Bool, length(select_variables))
+        for i in select_variables
+            if i in Symbol.(sr.state_names)
+                isstate[iter] = true
+            end
+            iter += 1
+            append!(indexes_sel_vars, getfield(sr.indexes_r, i))
+        end
+
+        LLirf_final(pp) =
+            -irfmatch(
+                pp,
+                IRFtargets,
+                weights,
+                shocks_selected,
+                isstate,
+                indexes_sel_vars,
+                priors,
+                sr,
+                lr,
+                m_par,
+                e_set,
+            )[3]
+
+        posterior_mode = -LLirf_final(par_final)
+        # if sr.n_par.verbose
+        #     @printf "Likelihood at mode under reduction: old: %f new: %f\n" ll_old posterior_mode
+        # end
+
+        # Compute Hessian at posterior mode
+        if e_set.compute_hessian == true
+            if sr.n_par.verbose
+                @printf "Computing Hessian. This might take a while...\n"
+            end
+            func = TwiceDifferentiable(pp -> LLirf_final(pp), par_final)
+            hessian_final = Optim.hessian!(func, par_final)
+        else
+            if sr.n_par.verbose
+                @printf "Assuming Hessian is I...\n"
+            end
+            hessian_final = Matrix{Float64}(I, length(par_final), length(par_final))
+        end
+
+        meas_error = []
+        meas_error_std = []
+        H_sel = []
+        smoother_output = []
+        Data = []
+        Data_missing = []
+
+        return par_final,
+        hessian_final,
+        posterior_mode,
+        meas_error,
+        meas_error_std,
+        parnames,
+        Data,
+        Data_missing,
+        IRFtargets,
+        IRFserrors,
+        H_sel,
+        priors,
+        smoother_output,
+        m_par,
+        sr,
+        lr
+
     else
-        if sr.n_par.verbose
-            @printf "Assuming Hessian is I...\n"
-        end
-        hessian_final = Matrix{Float64}(I, length(par_final), length(par_final))
+        error("estimation type not defined")
     end
-
-    return par_final,
-    hessian_final,
-    posterior_mode,
-    meas_error,
-    meas_error_std,
-    parnames,
-    Data,
-    Data_missing,
-    H_sel,
-    priors,
-    smoother_output,
-    m_par,
-    sr,
-    lr
 end
