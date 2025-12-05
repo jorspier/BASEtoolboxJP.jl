@@ -540,51 +540,6 @@ function error_term_distr!(
     F[indexes_distr.COP] = COP_thet
 end
 
-function CopulaDevPrime(
-    x::AbstractArray,
-    z::AbstractArray,
-    distrSS::CopulaPDFsOneAsset,
-    distrPrimeUpdate::CopulaPDFsOneAsset,
-    n_par::NumericalParameters,
-    ::LinearTransition,
-)
-    dt = typeof(distrSS) # distribution type
-    return mylinearinterpolate2(
-        get_CDF(distrPrimeUpdate.b, dt),
-        get_CDF(distrPrimeUpdate.h, dt),
-        distrPrimeUpdate.COP,
-        x,
-        z,
-    ) .- mylinearinterpolate2(
-        get_CDF(distrSS.b, dt),
-        get_CDF(distrSS.h, dt),
-        distrSS.COP,
-        x,
-        z,
-    )
-end
-
-function CopulaDevPrime(
-    x::AbstractArray,
-    z::AbstractArray,
-    distrSS::CopulaCDFsOneAsset,
-    distrPrimeUpdate::CopulaCDFsOneAsset,
-    n_par::NumericalParameters,
-    ::NonLinearTransition,
-)
-    COP_Prime_at_ss = zeros(eltype(distrPrimeUpdate.COP), (size(distrPrimeUpdate.COP)))
-    CDF_Dev = zeros(eltype(distrPrimeUpdate.COP), (n_par.nb_copula, n_par.nh_copula))
-    COP_Prime_at_ss .=
-        marginal_to_joint(distrPrimeUpdate.b, distrPrimeUpdate.COP, distrSS.b)
-    CDF_Dev .= marginal_to_joint(
-        distrSS.b,
-        COP_Prime_at_ss .- distrSS.COP,
-        x;
-        monotonic_spline = false,
-    )
-    return CDF_Dev
-end
-
 function error_term_distr!(
     F,
     CDFsPrimeUpdate::CDF,

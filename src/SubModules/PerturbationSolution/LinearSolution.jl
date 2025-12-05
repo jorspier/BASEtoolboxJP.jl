@@ -188,6 +188,41 @@ function LinearSolution(
     return gx, hx, alarm_LinearSolution, nk, A, B
 end
 
+"""
+    set_known_derivatives_distr!(A, dist_indexes, transform_elements, indexes,
+                                 n_par, transition_type, transform_type)
+
+Pre-fill known derivative blocks of the Jacobian matrix `A` (with respect to future states)
+for the distributional part of the state vector. This avoids redundant automatic differentiation
+and significantly speeds up linearization.
+
+The function exploits the structure of the distribution transition equations: the Jacobian
+with respect to future distributions follows directly from the state transition rules (Γ
+matrices) and the distribution representation (copula, CDF, or representative agent).
+
+Multiple methods handle different combinations of:
+
+  - `indexes`: Type indicating distribution representation (`CopulaTwoAssetsIndexes`, `CopulaOneAssetIndexes`, `CDFIndexes`, `RepAgentIndexes`).
+  - `transition_type`: `LinearTransition` or `NonLinearTransition`.
+  - `transform_type`: `LinearTransformation` or `ParetoTransformation`.
+
+# Arguments
+
+  - `A::AbstractMatrix`: Jacobian matrix (filled in-place).
+  - `dist_indexes::Vector`: Indices in the state vector corresponding to distributional variables.
+  - `transform_elements::TransformationElements`: Pre-computed transition operators (Γ matrices).
+  - `indexes`: Index struct specifying the distribution representation.
+  - `n_par::NumericalParameters`: Numerical parameters (grid sizes, etc.).
+  - `transition_type`: Either `LinearTransition` or `NonLinearTransition`.
+  - `transform_type`: Either `LinearTransformation` or `ParetoTransformation`.
+
+# Behavior
+
+Sets `A[dist_indexes, dist_indexes]` to `-I` (negative identity) as the base, then modifies
+specific blocks corresponding to each asset/income dimension using the transition matrices Γ.
+For CDF-based states with linear transformation, handles both unit and shuffled derivatives
+via cumsum logic. For Pareto transformation, uses only the base `-I` block.
+"""
 function set_known_derivatives_distr!(
     A,
     dist_indexes,
