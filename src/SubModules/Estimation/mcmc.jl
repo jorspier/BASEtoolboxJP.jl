@@ -1,17 +1,33 @@
-# contains
-# - rwmh
-# - multi_chain_init
-# - marginal_likeli
-
-@doc raw"""
+"""
     rwmh(xhat, Σ, sr, lr, er, m_par, e_set)
 
-Sample the posterior of the parameter vector using the Random-Walk Metropolis Hastings algorithm.
+Random-Walk Metropolis–Hastings sampler for the posterior of the model parameters.
+
+This routine draws `e_set.ndraws + e_set.burnin` proposals using a multivariate normal
+random walk with proposal covariance `Σ`, evaluates the (log) posterior using either
+`likeli` (default) or `irfmatch` (if `e_set.irf_matching == true`), and accepts/rejects via
+the usual MH rule.
+
+# Arguments
+
+  - `xhat::Vector{Float64}`: initial parameter vector (at least approximately feasible)
+  - `Σ::Symmetric{Float64,Array{Float64,2}}`: proposal covariance matrix for the random walk
+  - `sr, lr, er, m_par, e_set`: model structures and estimation settings; see package docs
 
 # Returns
-- `draws::Array{Float64,2}`: `e_set.ndraws + e_set.burnin` sampled parameter vectors (row vectors)
-- `posterior`: vector of posteriors for the respective draws
-- `accept_rate`: acceptance rate
+
+  - `draws::Matrix{Float64}`: `(e_set.ndraws + e_set.burnin) × length(xhat)` matrix of
+    draws, each row a parameter vector
+  - `posterior::Vector{Float64}`: log posterior for each stored draw (likelihood + prior)
+  - `accept_rate::Float64`: overall acceptance rate
+
+Notes:
+
+  - When `e_set.irf_matching == false`, the posterior is computed with `likeli`.
+  - When `e_set.irf_matching == true`, IRF targets are read from a CSV according to
+    `e_set.irf_matching_dict`, and the posterior is computed with `irfmatch` using
+    inverse-variance weights. The function periodically prints progress (draw count,
+    acceptance rate, posterior) and the current parameters.
 """
 function rwmh(
     xhat::Vector{Float64},
@@ -186,7 +202,7 @@ function rwmh(
                 unmute_printf("-----------------------\n\n")
 
                 pretty_table(
-                    LoggingTools.ORIG_STDOUT,   # <—— force it to print to the saved stdout
+                    Tools.ORIG_STDOUT,   # <—— force it to print to the saved stdout
                     [
                         "Number of draws" i
                         "Acceptance Rate" @sprintf("%.4f", accept / i)
@@ -207,14 +223,26 @@ function rwmh(
     end
 end
 
-@doc raw"""
+"""
     multi_chain_init(xhat, Σ, sr, lr, er, m_par, e_set)
 
-Draw overdispersed initial values for multi-chain RWMH.
+Construct an overdispersed starting value for a Metropolis–Hastings chain.
+
+Draws proposals from `MvNormal(0, Σ)` scaled by `2 * e_set.mhscale` around `xhat` and keeps
+the first candidate that yields a feasible model (no alarm from `likeli`). Tries up to 100
+times.
+
+# Arguments
+
+  - `xhat::Vector{Float64}`: baseline parameter vector
+  - `Σ::Symmetric{Float64,Array{Float64,2}}`: covariance used to generate overdispersed
+    proposals
+  - `sr, lr, er, m_par, e_set`: model structures and estimation settings
 
 # Returns
-- `init_draw`: overdispersed starting value for chain
-- `init_draw`: Bool variable indicating whether search was succesful
+
+  - `init_draw::Vector{Float64}`: overdispersed, feasible starting parameter vector
+  - `init_success::Bool`: whether a feasible start was found within 100 attempts
 """
 function multi_chain_init(
     xhat::Vector{Float64},
@@ -244,13 +272,27 @@ function multi_chain_init(
     return init_draw, init_success
 end
 
-@doc raw"""
+"""
     marginal_likeli(draws, posterior)
 
-Estimate the marginal likelihood via Modified Harmonic Mean Estimator (Geweke, 1998)
+Estimate the log marginal likelihood using the Modified Harmonic Mean estimator of Geweke
+(1998), averaging over a grid of truncation levels.
+
+Given MCMC draws `θ_i` and their log posteriors `posterior[i]`, the estimator computes
+Gaussian kernel densities within a χ²-ball defined by `τ ∈ {0.1, …, 0.9}` and averages the
+implied marginal-likelihood estimates for stability.
+
+# Arguments
+
+  - `draws::AbstractMatrix{<:Real}`: `ndraws × npars` matrix of parameter draws
+  - `posterior::AbstractVector{<:Real}`: log posterior evaluations for the draws
 
 # Returns
-- `marg_likeli`: marginal likelihood
+
+  - `marg_likeli::Float64`: estimated log marginal likelihood
+
+Caution: As with all harmonic-mean style estimators, results can be sensitive to tail
+behavior and mixing. Use with diagnostics and, if possible, alternative estimators.
 """
 function marginal_likeli(draws, posterior)
     ndraws, npars = size(draws)

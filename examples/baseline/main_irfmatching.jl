@@ -50,7 +50,7 @@ e_set = EstimationSettings(;
         :LPXA, # Ex-ante liquidity premium
     ],
     max_iter_mode = 2000,
-    f_tol = 1.0e-6,
+    f_reltol = 1.0e-6,
     x_tol = 1.0e-8,
     ndraws = 1500,
     burnin = 6000,
@@ -92,8 +92,7 @@ Bgov = exp.(sr_full.XSS[sr_full.indexes.BgovSS]);
 Y = exp.(sr_full.XSS[sr_full.indexes.YSS]);
 T10W = exp(sr_full.XSS[sr_full.indexes.TOP10WshareSS]);
 G = exp.(sr_full.XSS[sr_full.indexes.GSS]);
-distr_b = sum(sr_full.distrSS; dims = (2, 3))[:];
-fr_borr = sum(distr_b[sr_full.n_par.grid_b .< 0]);
+fr_borr = BASEforHANK.eval_cdf(sr_full.distrSS, :b, sr_full.n_par, 0.0);
 
 # Display steady state moments
 @printf "\n"

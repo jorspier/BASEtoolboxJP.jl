@@ -15,11 +15,6 @@ corresponding variable needs to be in the list of states or controls.
 ## Auxiliary variables
 ## ----------------------------------------------------------------------------------------
 
-## Taxation -------------------------------------------------------------------------------
-
-# Mass of households in each productivity state, distribution is (nb, nk, nh)
-distr_h = sum(distrSS; dims = (1, 2))
-
 # Constant markups (like RBC model)
 mcw = 1.0 ./ m_par.μw
 mc = 1.0 ./ m_par.μ

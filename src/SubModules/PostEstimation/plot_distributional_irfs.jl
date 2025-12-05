@@ -292,7 +292,7 @@ function plot_bivariate_animation(
             ylims = y_limits,
             color = :winter,
             legend = legend,
-            title = "$lab for shock to $i_shock_lab, Horizon: $i",
+            title = "$lab for shock to $i_shock_lab,\n Horizon: $i",
             titlefontsize = 10,
             display_option = Plots.GR.OPTION_SHADED_MESH,
         )

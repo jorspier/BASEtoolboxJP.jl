@@ -1,5 +1,35 @@
-@doc raw"""
-    ...
+"""
+    MultipleDirectTransition(b_a_star, b_n_star, k_a_star, distr, λ, Π, n_par)
+
+Compute the stationary distribution under the policy-driven "direct transition"
+(non-stochastic) operator by iterating the mapping until convergence. This routine builds
+transition weights from the policy functions using `MakeWeights` and redistributes mass
+according to the adjustment probability `λ` and idiosyncratic transition matrix `Π`.
+
+Arguments
+
+  - `b_a_star::Array{Float64,3}`: liquid-asset policy when agents adjust (shape nb×nk×nh).
+  - `b_n_star::Array{Float64,3}`: liquid-asset policy when agents do not adjust.
+  - `k_a_star::Array{Float64,3}`: illiquid-asset policy for adjusters.
+  - `distr::Array{Float64,3}`: initial joint distribution over `(b,k,h)`.
+  - `λ::Float64`: fraction/probability of agents who adjust their illiquid asset.
+  - `Π::Array{Float64,2}`: idiosyncratic productivity transition matrix (nh×nh).
+  - `n_par`: numerical parameters providing `grid_b`, `grid_k`, `nb`, `nk`, `nh`, and `ϵ`.
+
+Returns
+
+  - `distr::Array{Float64,3}`: converged joint distribution (same shape as input).
+  - `dist::Float64`: maximum absolute difference between the last two iterates (sup-norm).
+  - `count::Int`: number of iterations performed.
+
+Details
+
+  - Uses linear interpolation weights (left/right) produced by `MakeWeights` to split mass
+    across neighboring grid points when policies point between grid nodes. The
+    redistribution respects idiosyncratic transitions via `Π` and mixes adjusters and
+    non-adjusters according to `λ`.
+  - Iteration continues until `dist <= n_par.ϵ` or a safety cap of 10_000 iterations is
+    reached.
 """
 function MultipleDirectTransition(
     b_a_star::Array{Float64,3},

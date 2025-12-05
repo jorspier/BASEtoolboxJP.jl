@@ -36,7 +36,6 @@ BASEforHANK.LinearAlgebra.BLAS.set_num_threads(Threads.nthreads());
 ## ------------------------------------------------------------------------------------------
 
 m_par = ModelParameters();
-e_set = BASEforHANK.e_set;
 
 ## ------------------------------------------------------------------------------------------
 ## Calculate Steady State and prepare linearization
@@ -55,7 +54,6 @@ Bgov = exp.(sr_full.XSS[sr_full.indexes.BgovSS]);
 Y = exp.(sr_full.XSS[sr_full.indexes.YSS]);
 T10W = exp(sr_full.XSS[sr_full.indexes.TOP10WshareSS]);
 G = exp.(sr_full.XSS[sr_full.indexes.GSS]);
-distr_b = [1.0];
 fr_borr = 0.0;
 
 # Display steady state moments

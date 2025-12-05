@@ -1,22 +1,66 @@
-@doc raw"""
-    mode_finding(XSSaggr, A, B, indexes, indexes_aggr, distrSS, compressionIndexes, m_par, n_par, e_set)
+"""
+    mode_finding(sr, lr, m_par, e_set, par_start)
 
-Given definition of observed variables and their transformation (level or growth rate) from `e_set`,
-load the data, construct the observation equation, and maximize [`likeli()`](@ref) (the log-likelihood)
-using the package `Optim`.
+Find the posterior mode of the parameter vector via numerical optimization.
 
-Save estimation results to `e_set.save_mode_file`.
+Two estimation modes are supported:
+
+  - Likelihood estimation (default, when `e_set.irf_matching == false`): loads time-series
+    data, builds the observation matrix, and maximizes the log posterior via `likeli` using
+    `Optim`.
+  - IRF matching (when `e_set.irf_matching == true`): loads IRF targets from CSV according
+    to `e_set.irf_matching_dict`, builds weights, and maximizes the IRF-matching objective
+    via `irfmatch`.
+
+In both modes, the routine updates the reduced model using `model_reduction`/`update_model`
+between optimization rounds to improve accuracy, and it optionally computes a Hessian at the
+mode.
+
+# Arguments
+
+  - `sr`: structural/reduced-system container (sizes, indexes, reduction flags)
+  - `lr`: linearization container (A, B matrices and caches)
+  - `m_par`: model parameter struct (Flatten-compatible)
+  - `e_set::EstimationSettings`: controls data paths, observables, priors, optimizer and
+    tolerances, measurement-error treatment, IRF-matching settings, and flags like
+    `compute_hessian`
+  - `par_start::AbstractVector`: initial parameter vector (includes measurement-error stds
+    if estimated)
 
 # Returns
-- `par_final`: parameter vector that maximizes the likelihood
-- `hessian_final`: Hessian of the log-likelihood at `par_final`
-- `posterior_mode`: log-likelihood at `par_final`
-- `meas_error`,`meas_error_std`: returns from [`measurement_error()`](@ref)
-- `parnames`: names of estimated parameters (including measurement error variances)
-- `Data`,`Data_missing`: data from `e_set.data_file`; marker for missing data
-- `H_sel`: selector matrix for states/controls that are observed
-- `priors`: priors of parameters (including measurement error variances)
-- `smoother_output`: output from the Kalman smoother
+
+Returns a 16-tuple with elements depending on the mode:
+
+ 1. `par_final::Vector{Float64}`: parameter vector at the mode
+ 2. `hessian_final::Matrix{Float64}`: Hessian at the mode (finite-diff or identity if
+    disabled)
+ 3. `posterior_mode::Float64`: value of the objective at the mode (log posterior)
+ 4. `meas_error`: mapping from observable names to column indexes (likelihood mode); `[]`
+    for IRF matching
+ 5. `meas_error_std::Vector{Float64}`: std caps or fixed stds (likelihood mode); `[]` for
+    IRF matching
+ 6. `parnames::Vector{Symbol}`: names of estimated parameters (incl. ME params if not fixed)
+ 7. `Data::Matrix{Float64}`: data matrix (likelihood mode); `[]` for IRF matching
+ 8. `Data_missing::BitMatrix`: missingness mask (likelihood mode); `[]` for IRF matching
+ 9. `IRFtargets::Array{Float64,3}`: target IRFs (IRF matching); empty otherwise
+10. `IRFserrors::Array{Float64,3}`: IRF target standard errors (IRF matching); empty
+    otherwise
+11. `H_sel::Matrix{Float64}`: selection matrix mapping states/controls to observables
+    (likelihood mode); empty for IRF matching
+12. `priors::Vector{<:Distribution}`: priors for structural (and ME) parameters
+13. `smoother_output`: Kalman smoother output from `likeli(...; smoother=true)` (likelihood
+    mode); empty for IRF matching
+14. `m_par`: parameter struct updated at `par_final`
+15. `sr`: structural container after final reduction update
+16. `lr`: linearization container after final update
+
+Notes:
+
+  - Measurement errors are constructed by `measurement_error` and included in `parnames` and
+    `priors` unless `e_set.me_treatment == :fixed`. # No irf matching? => likelihood
+    estimation
+  - The optimizer and tolerances are taken from `e_set` (e.g., `e_set.optimizer`,
+    `e_set.x_tol`).        # Load data
 """
 function mode_finding(sr, lr, m_par, e_set, par_start)
     if !e_set.irf_matching # No irf matching? => likelihood estimation
@@ -93,7 +137,7 @@ function mode_finding(sr, lr, m_par, e_set, par_start)
             show_every = 20,
             store_trace = true,
             x_abstol = e_set.x_tol,
-            f_reltol = e_set.f_tol,
+            f_reltol = e_set.f_reltol,
             iterations = div(e_set.max_iter_mode, 3),
         )
         opti = optimize(Laux, par, e_set.optimizer, OptOpt)
@@ -145,7 +189,7 @@ function mode_finding(sr, lr, m_par, e_set, par_start)
             show_every = 20,
             store_trace = true,
             x_abstol = e_set.x_tol,
-            f_reltol = e_set.f_tol,
+            f_reltol = e_set.f_reltol,
             iterations = div(e_set.max_iter_mode, 3) * 2,
         )
         opti = optimize(LL, Optim.minimizer(opti), e_set.optimizer, OptOpt)
@@ -367,7 +411,7 @@ function mode_finding(sr, lr, m_par, e_set, par_start)
             show_every = 20,
             store_trace = true,
             x_abstol = e_set.x_tol,
-            f_reltol = e_set.f_tol,
+            f_reltol = e_set.f_reltol,
             iterations = e_set.max_iter_mode,
         )
 

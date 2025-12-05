@@ -1,6 +1,7 @@
 # __precompile__(false)
 
 module BASEforHANK
+
 if !Sys.isapple() # issues encountered when using mkl with macos + more than 1 thread
     using MKL
 end
@@ -29,8 +30,7 @@ import Flatten: flattenable
 include("SubModules/Types.jl")
 using .Types
 include("SubModules/Tools.jl")
-include("SubModules/LoggingTools.jl")
-using .LoggingTools
+using .Tools
 
 # Submodules that define functions used by parent
 include("SubModules/Parsing.jl")
@@ -79,10 +79,12 @@ export compute_irfs,
     plot_vardecomp,
     plot_vardecomp_bcfreq,
     plot_distributional_irfs,
-    plot_hist_decomp
+    plot_hist_decomp,
+    transformation_elements
 
 # Functions passed through from 3rd Party packages
 export mode, metaflatten, prior, label, jldsave, @set!, @load
+export quiet_call
 
 # Documentation: if paths to model are not defined, the code will use the baseline example.
 if !isdefined(Main, :paths)
@@ -96,58 +98,57 @@ include("Preprocessor/prior.jl")
 ## Define Functions
 # ------------------------------------------------------------------------------
 
-@doc raw"""
-    call_find_steadystate(m_par)
+"""
+    call_find_steadystate(m_par; n_par_kwargs::NamedTuple=NamedTuple())
 
 Computes the steady state of the household problem and fills the SteadyStateStruct struct
 (without further steps of preparing the linearization).
 
 # Arguments
-- `m_par::ModelParameters`
+
+  - `m_par::ModelParameters`
+  - `n_par_kwargs::NamedTuple=NamedTuple()`: Additional keyword arguments passed to
+    [`NumericalParameters()`](@ref) when initializing the numerical parameters.
 
 # Returns
-- `SteadyStateStruct`, containing returns of [`find_steadystate()`](@ref)
+
+  - `SteadyStateStruct`, containing returns of [`find_steadystate()`](@ref)
 """
-function call_find_steadystate(m_par::ModelParameters)
+function call_find_steadystate(
+    m_par::ModelParameters;
+    n_par_kwargs::NamedTuple = NamedTuple(),
+)
     @printf "\n"
     @printf "Compute the steady state...\n"
 
-    KSS, WbSS, WkSS, distrSS, n_par, m_par = find_steadystate(m_par)
+    KSS, vfSS, distrSS, n_par, m_par = find_steadystate(m_par; n_par_kwargs = n_par_kwargs)
 
     @printf "Compute the steady state... Done.\n"
 
-    return SteadyStateStruct(KSS, WbSS, WkSS, distrSS, n_par)
+    return SteadyStateStruct(KSS, vfSS, distrSS, n_par)
 end
 
-@doc raw"""
+"""
     call_prepare_linearization(ss, m_par)
 
 Prepares linearization and fills the SteadyResults struct.
 
 # Arguments
-- `ss::SteadyStateStruct`: Output of [`call_find_steadystate()`](@ref)
-- `m_par::ModelParameters`
+
+  - `ss::SteadyStateStruct`: Output of [`call_find_steadystate()`](@ref)
+  - `m_par::ModelParameters`
 
 # Returns
-- `SteadyResults`, containing returns of [`prepare_linearization()`](@ref)
+
+  - `SteadyResults`, containing returns of [`prepare_linearization()`](@ref)
 """
 function call_prepare_linearization(ss::SteadyStateStruct, m_par::ModelParameters)
     @printf "\n"
     @printf "Prepare the linearization...\n"
 
     # Prepare steady state information for linearization
-    XSS,
-    XSSaggr,
-    indexes,
-    indexes_aggr,
-    compressionIndexes,
-    n_par,
-    m_par,
-    CDFSS,
-    CDF_bSS,
-    CDF_kSS,
-    CDF_hSS,
-    distrSS = prepare_linearization(ss.KSS, ss.WbSS, ss.WkSS, ss.distrSS, ss.n_par, m_par)
+    XSS, XSSaggr, indexes, indexes_aggr, compressionIndexes, n_par, m_par, CDFSS =
+        prepare_linearization(ss.KSS, ss.vfSS, ss.distrSS, ss.n_par, m_par)
 
     # Check that the steady state is well-defined
     idx_not = findall(isnan.(XSS) .| isinf.(XSS))
@@ -160,9 +161,11 @@ function call_prepare_linearization(ss::SteadyStateStruct, m_par::ModelParameter
     end
 
     if n_par.verbose
-        @printf "Number of DCTs for Wb: %d\n" length(compressionIndexes[1])
-        @printf "Number of DCTs for Wk: %d\n" length(compressionIndexes[2])
-        @printf "Number of DCTs for COP: %d\n" length(compressionIndexes[3])
+        @printf "Number of DCTs for Value functions: %d\n" sum(
+            length.(compressionIndexes[1]);
+            init = 0,
+        )
+        @printf "Number of DCTs for COP: %d\n" length(compressionIndexes[2])
     end
 
     @printf "Prepare the linearization... Done.\n"
@@ -177,25 +180,23 @@ function call_prepare_linearization(ss::SteadyStateStruct, m_par::ModelParameter
         n_par,
         m_par,
         CDFSS,
-        CDF_bSS,
-        CDF_kSS,
-        CDF_hSS,
-        distrSS,
         state_names,
         control_names,
     )
 end
 
-@doc raw"""
+"""
     compute_steadystate(m_par)
 
 A wrapper for [`call_find_steadystate()`](@ref) and [`call_prepare_linearization()`](@ref).
 
 # Arguments
-- `m_par::ModelParameters`
+
+  - `m_par::ModelParameters`
 
 # Returns
-- `SteadyResults`, containing returns of [`prepare_linearization()`](@ref)
+
+  - `SteadyResults`, containing returns of [`prepare_linearization()`](@ref)
 """
 function compute_steadystate(m_par::ModelParameters)
     ss = call_find_steadystate(m_par)
@@ -203,25 +204,30 @@ function compute_steadystate(m_par::ModelParameters)
     return sr
 end
 
-@doc raw"""
+"""
     linearize_full_model(sr, m_par; ss_only = false)
 
 Linearize the full model (i.e. including idiosyncratic states and controls) around the
 steady state, and solves using [`LinearSolution()`](@ref).
 
 # Arguments
-- `sr::SteadyResults`: Output of [`call_prepare_linearization()`](@ref)
-- `m_par::ModelParameters`
-- `ss_only::Bool`: If `true`, only the steady state is checked
+
+  - `sr::SteadyResults`: Output of [`call_prepare_linearization()`](@ref)
+  - `m_par::ModelParameters`
+  - `ss_only::Bool`: If `true`, only the steady state is checked
 
 # Returns
-- `LinearResults`, containing
 
-    - `State2Control::Array{Float64,2}`: Matrix of observation equation
-    - `LOMstate::Array{Float64,2}`: Matrix of state transition equation
-    - `A::Array{Float64,2}`,`B::Array{Float64,2}`: First derivatives of
-      [`PerturbationSolution.Fsys()`](@ref) with respect to arguments `X` [`B`] and `XPrime`
-      [`A`]
+`LinearResults`, containing
+
+  - `State2Control::Array{Float64,2}`: Matrix of observation equation
+  - `LOMstate::Array{Float64,2}`: Matrix of state transition equation
+  - `A::Array{Float64,2}`: Jacobian of [`PerturbationSolution.Fsys()`](@ref) with respect to
+    `XPrime`.
+  - `B::Array{Float64,2}`: Jacobian of [`PerturbationSolution.Fsys()`](@ref) with respect to
+    `X`.
+  - `SolutionError::Bool`: indicator whether solution failed
+  - `nk::Int`: Number of shocks
 """
 function linearize_full_model(sr::SteadyResults, m_par::ModelParameters; ss_only = false)
     @printf "\n"
@@ -243,24 +249,40 @@ function linearize_full_model(sr::SteadyResults, m_par::ModelParameters; ss_only
     return LinearResults(State2Control, LOMstate, A, B, SolutionError, nk)
 end
 
-@doc raw"""
+"""
     find_mode(sr, lr, m_par, e_set)
 
 Find parameter that maximizes likelihood of data given linearized model `lr`.
 
 # Arguments
-- `sr::SteadyResults`: Output of [`call_prepare_linearization()`](@ref)
-- `lr::LinearResults`: Output of [`linearize_full_model()`](@ref)
-- `m_par::ModelParameters`
-- `e_set::EstimationSettings`
+
+  - `sr::SteadyResults`: Output of [`call_prepare_linearization()`](@ref)
+  - `lr::LinearResults`: Output of [`linearize_full_model()`](@ref)
+  - `m_par::ModelParameters`
+  - `e_set::EstimationSettings`
 
 # Returns
-- `EstimResults`, containing all returns of [`mode_finding()`](@ref)
-- `posterior_mode::Array{Float64,1}`: Mode of the posterior
-- `smoother_output::Array{Float64,2}`: Smoother output
-- `sr::SteadyResults`: Updated `SteadyResults`
-- `lr::LinearResults`: Updated `LinearResults`
-- `m_par::ModelParameters`: Updated `ModelParameters`
+
+  - `EstimResults`, containing all returns of [`mode_finding()`](@ref)
+
+      + `posterior_mode::Float64`: value of the log posterior at the mode
+      + `smoother_output`: output from `likeli(...; smoother=true)` (Kalman smoother tuple)
+      + `sr::SteadyResults`: Updated `SteadyResults` (may be modified by the routine)
+      + `lr::LinearResults`: Updated `LinearResults` (may be modified by the routine)
+      + `m_par::ModelParameters`: Updated `ModelParameters` (may be modified)
+
+  - `posterior_mode::Float64`: value of the log posterior at the mode
+  - `smoother_output`: output from `likeli(...; smoother=true)` (Kalman smoother tuple)
+  - `sr::SteadyResults`: Updated `SteadyResults` (may be modified by the routine)
+  - `lr::LinearResults`: Updated `LinearResults` (may be modified by the routine)
+  - `m_par::ModelParameters`: Updated `ModelParameters` (may be modified)
+
+Notes
+
+  - If `e_set.mode_start_file` is set, the function attempts to read a JSON file at that
+    path to initialize the optimization; the file is read (JSON.parse) and its contents are
+    used to build the starting vector. This function therefore performs file I/O when
+    `e_set.mode_start_file != ""`.
 """
 function find_mode(
     sr::SteadyResults,
@@ -340,30 +362,38 @@ function find_mode(
     return er, posterior_mode, smoother_output, sr, lr, m_par
 end
 
-@doc raw"""
-    mcmc_estimation(sr, lr, er, m_par, e_set)
+"""
+    sample_posterior(sr, lr, er, m_par, e_set)
 
-Sample posterior of parameter vector with [`rwmh()`](@ref), take sample mean as parameter
-estimate, and save all results in `file`.
+Sample from the posterior with Random-Walk Metropolis–Hastings [`rwmh()`](@ref), compute the
+sample mean as a point estimate, and return draws and diagnostics.
 
 # Arguments
-- `sr::SteadyResults`: Output of [`call_prepare_linearization()`](@ref)
-- `lr::LinearResults`: Output of [`linearize_full_model()`](@ref)
-- `er::EstimResults`: Output of [`find_mode()`](@ref)
-- `m_par::ModelParameters`
-- `e_set::EstimationSettings`
+
+  - `sr::SteadyResults`: Output of [`call_prepare_linearization()`](@ref)
+  - `lr::LinearResults`: Output of [`linearize_full_model()`](@ref)
+  - `er::EstimResults`: Output of [`find_mode()`](@ref)
+  - `m_par::ModelParameters`
+  - `e_set::EstimationSettings`
 
 # Returns
-- `sr::SteadyResults`: Updated `SteadyResults`
-- `lr::LinearResults`: Updated `LinearResults`
-- `er::EstimResults`: Updated `EstimResults`
-- `m_par::ModelParameters`: Updated `ModelParameters`
-- `draws_raw::Array{Float64,2}`: Raw draws from the posterior
-- `posterior::Array{Float64,1}`: Posterior
-- `accept_rate::Float64`: Acceptance rate
-- `par_final::Array{Float64,1}`: Mode of the posterior
-- `hessian_sym::Symmetric{Float64,Array{Float64,2}}`: Hessian of the posterior
-- `smoother_output::Array{Float64,2}`: Smoother output
+
+  - `sr::SteadyResults`: Updated `SteadyResults`
+  - `lr::LinearResults`: Updated `LinearResults`
+  - `er::EstimResults`: Updated `EstimResults`
+  - `m_par::ModelParameters`: Updated `ModelParameters`
+  - `draws_raw::Array{Float64,2}`: Raw draws from the posterior
+  - `posterior::Array{Float64,1}`: Posterior
+  - `accept_rate::Float64`: Acceptance rate
+  - `par_final::Array{Float64,1}`: Mode of the posterior
+  - `hessian_sym::Symmetric{Float64,Array{Float64,2}}`: Hessian of the posterior
+  - `smoother_output`: Kalman smoother output at `par_final` (may be empty when
+    `e_set.irf_matching == true`)
+
+Notes
+
+  - This routine prints progress messages to STDOUT while running ("Started MCMC...").
+  - When `e_set.irf_matching == true` the function returns `smoother_output = []`.
 """
 function sample_posterior(
     sr::SteadyResults,

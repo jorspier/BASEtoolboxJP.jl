@@ -1,11 +1,10 @@
-@doc raw"""
+"""
     Kdiff(
         KD,
         n_par,
         m_par,
         initialize = true,
-        Wb_guess = zeros(1, 1, 1),
-        Wk_guess = zeros(1, 1, 1),
+        valueFunc_guess::AbstractArray,
         distr_guess = zeros(1, 1, 1)
     )
 
@@ -19,22 +18,23 @@ households face idiosyncratic income risk (Aiyagari model).
 Requires global functions from the IncomesETC module and [`Ksupply()`](@ref).
 
 # Arguments
-- `KD::Float64`: Assumed capital demand (guess)
-- `n_par::NumericalParameters`, `m_par::ModelParameters`
-- `initialize::Bool = true`: If true, initialize the marginal value functions and
+
+  - `KD::Float64`: Assumed capital demand (guess)
+  - `n_par::NumericalParameters`, `m_par::ModelParameters`
+  - `initialize::Bool = true`: If true, initialize the marginal value functions and
     stationary distribution, otherwise use the provided guesses that follow. Providing the
     guesses can be used in [`CustomBrent()`](@ref) to speed up the solution since the
     results from the previous iteration can be used as starting values.
-- `Wb_guess::AbstractArray = zeros(1, 1, 1)`: Guess for marginal value of liquid assets
-- `Wk_guess::AbstractArray = zeros(1, 1, 1)`: Guess for marginal value of illiquid
-    assets
-- `distr_guess::AbstractArray = zeros(1, 1, 1)`: Guess for stationary distribution
+  - `Wb_guess::AbstractArray = zeros(1, 1, 1)`: Guess for marginal value of liquid assets
+  - `Wk_guess::AbstractArray = zeros(1, 1, 1)`: Guess for marginal value of illiquid assets
+  - `distr_guess::AbstractArray = zeros(1, 1, 1)`: Guess for stationary distribution
 
 # Returns
-- `diff::Float64`: Difference between the demanded and supplied capital stock
-- `Wb::AbstractArray`: Marginal value of liquid assets, implied by capital demand
-- `Wk::AbstractArray`: Marginal value of illiquid assets, implied by capital demand
-- `distr::AbstractArray`: Stationary distribution of idiosyncratic states, implied by
+
+  - `diff::Float64`: Difference between the demanded and supplied capital stock
+  - `Wb::AbstractArray`: Marginal value of liquid assets, implied by capital demand
+  - `Wk::AbstractArray`: Marginal value of illiquid assets, implied by capital demand
+  - `distr::AbstractArray`: Stationary distribution of idiosyncratic states, implied by
     capital demand
 """
 function Kdiff(
@@ -42,9 +42,8 @@ function Kdiff(
     n_par,
     m_par;
     initialize::Bool = true,
-    Wb_guess::AbstractArray = zeros(1, 1, 1),
-    Wk_guess::AbstractArray = zeros(1, 1, 1),
-    distr_guess::AbstractArray = zeros(1, 1, 1),
+    valueFunc_guess::AbstractArray,
+    distr_guess::AbstractArray,
 )
 
     ## ------------------------------------------------------------------------------------
@@ -83,19 +82,24 @@ function Kdiff(
             @warn "Negative consumption guess. Potentially reduce Kmax_coarse!"
         end
 
-        # Based on consumption guess update the marginal value of liquid assets
-        Wb = eff_int .* mutil(x_guess, m_par)
-
-        # Based on consumption guess update the marginal value of illiquid assets
-        Wk = (RK + m_par.λ) .* mutil(x_guess, m_par)
+        # Based on consumption guess update the marginal values
+        vf = if isa(n_par.model, OneAsset)
+            ValueFunctionsOneAsset(eff_int .* mutil(x_guess, m_par))
+        elseif isa(n_par.model, TwoAsset)
+            ValueFunctionsTwoAssets(
+                eff_int .* mutil(x_guess, m_par),
+                (RK + m_par.λ) .* mutil(x_guess, m_par),
+            )
+        else
+            ValueFunctionsCompleteMarkets(ones(eltype(x_guess), size(x_guess)) .* eff_int)
+        end
 
         # Guess stationary distribution
         distr = n_par.dist_guess
     else
 
         # Use provided keyword arguments
-        Wb = Wb_guess
-        Wk = Wk_guess
+        vf = valFunc_from_vec(valueFunc_guess, n_par.model)
         distr = distr_guess
     end
 
@@ -104,12 +108,12 @@ function Kdiff(
     ## ------------------------------------------------------------------------------------
 
     # Call function Ksupply from fcn_ksupply.jl
-    KsupplyOut = Ksupply(args_hh_prob, n_par, m_par, Wb, Wk, distr, net_income, eff_int)
+    KsupplyOut = Ksupply(args_hh_prob, n_par, m_par, vf, distr, net_income, eff_int)
 
     # Unpack results
     KS = KsupplyOut[1]
-    Wb = KsupplyOut[end - 2]
-    Wk = KsupplyOut[end - 1]
+    vf = KsupplyOut[end - 1]
+    vf_vec = struc_to_vec(vf)
     distr = KsupplyOut[end]
 
     # Calculate excess supply of funds
@@ -119,5 +123,5 @@ function Kdiff(
     ## Return results
     ## ------------------------------------------------------------------------------------
 
-    return diff, Wb, Wk, distr
+    return diff, vf_vec, distr
 end

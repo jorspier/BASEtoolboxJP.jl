@@ -65,7 +65,7 @@ and their corresponding inverse `IDC`.
   - Since usually information is lost during compression, the uncompressed data will not be
     identical to the original data.
 """
-function uncompress(compressionIndexes, XC, DC, IDC)
+function uncompress(compressionIndexes, XC, DC, IDC, model::TwoAsset)
     nb = size(DC[1], 1)
     nk = size(DC[2], 1)
     nh = size(DC[3], 1)
@@ -80,6 +80,18 @@ function uncompress(compressionIndexes, XC, DC, IDC)
         θ1[bb, :, :] = θ1[bb, :, :] * DC[3]
     end
     θ = reshape(θ1, (nb) * (nk) * (nh))
+    return θ
+end
+
+function uncompress(compressionIndexes, XC, DC, IDC, model::OneAsset)
+    nb = size(DC[1], 1)
+    nh = size(DC[2], 1)
+    θ1 = zeros(eltype(XC), nb, nh)
+    for j in eachindex(XC)
+        θ1[compressionIndexes[j]] = copy(XC[j])
+    end
+    θ1 = IDC[1] * θ1 * DC[2]
+    θ = reshape(θ1, (nb) * (nh))
     return θ
 end
 
@@ -120,6 +132,7 @@ function compress(
     XU::AbstractArray,
     DC::AbstractArray,
     IDC::AbstractArray,
+    model::TwoAsset,
 )
     nb, nk, nh = size(XU)
     θ = zeros(eltype(XU), length(compressionIndexes))
@@ -130,6 +143,20 @@ function compress(
     @inbounds @views for y = 1:nh
         XU2[:, :, y] = DC[1] * XU2[:, :, y]
     end
+    θ = XU2[compressionIndexes]
+    return θ
+end
+
+function compress(
+    compressionIndexes::AbstractArray,
+    XU::AbstractArray,
+    DC::AbstractArray,
+    IDC::AbstractArray,
+    model::OneAsset,
+)
+    θ = zeros(eltype(XU), length(compressionIndexes))
+    XU2 = zeros(eltype(XU), size(XU))
+    XU2 = DC[1] * XU * IDC[2]
     θ = XU2[compressionIndexes]
     return θ
 end

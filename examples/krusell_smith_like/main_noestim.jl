@@ -36,7 +36,6 @@ BASEforHANK.LinearAlgebra.BLAS.set_num_threads(Threads.nthreads());
 ## ------------------------------------------------------------------------------------------
 
 m_par = ModelParameters();
-e_set = BASEforHANK.e_set;
 
 ## ------------------------------------------------------------------------------------------
 ## Calculate Steady State and prepare linearization
@@ -52,8 +51,7 @@ sr_full = call_prepare_linearization(ss_full, m_par);
 K = exp.(sr_full.XSS[sr_full.indexes.KSS]);
 Y = exp.(sr_full.XSS[sr_full.indexes.YSS]);
 T10W = exp(sr_full.XSS[sr_full.indexes.TOP10WshareSS]);
-distr_b = sum(sr_full.distrSS; dims = (2, 3))[:];
-fr_borr = sum(distr_b[sr_full.n_par.grid_b .< 0]);
+fr_borr = BASEforHANK.eval_cdf(sr_full.distrSS, :b, sr_full.n_par, 0.0);
 
 # Display steady state moments
 @printf "\n"

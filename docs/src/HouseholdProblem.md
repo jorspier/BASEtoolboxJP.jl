@@ -1,13 +1,13 @@
 # Documentation of the household problem
 
-This section documents the household problem that is at the core of the package. Most features are also present in BBL, however, the package extends the model. As a user, given the household problem, you can specify the "surrounding" aggregate equations that determine the inputs to the household problem. You can switch off features of the household problem by setting the parameters or variables accordingly.
+This section documents the household problem that is at the core of the package. Most features are also present in [Bayer, Born, and Luetticke (2024)](https://www.aeaweb.org/articles?id=10.1257/aer.20201875), henceforth BBL; however, the package extends their model. As a user, given the household problem, you can specify the "surrounding" aggregate equations that determine the inputs to the household problem. You can switch off features of the household problem by setting the parameters or variables accordingly.
 
-The **most important assumptions** of the household problem are the following:
+The **most important properties** of the household problem (most of which can be changed by the user) are the following:
 
 1. GHH preferences with labor supply decision
 2. Taxes: linear and progressive labor and entrepreneurial income tax, linear value-added tax, linear union-profit tax, linear capital income tax, household-specific but non-distortionary transfers
 3. Entrepreneurship as an idiocyncratic state
-4. 2 accounts: liquid and illiquid assets – note: this can be switched off in the code
+4. Liquid and illiquid assets
 
 At the end of this section, we provide a list of **necessary inputs** to the household problem.
 

@@ -566,6 +566,10 @@ Collect parameters for the numerical solution of the model in a `struct`.
 
     # model we are solving
     model = TwoAsset()
+    transition_type = LinearTransition()
+    distribution_states = CopulaStates()
+    entrepreneur::Bool = true
+    GHH::Bool = true
 
     # regular grid
     nh::Int = 14
@@ -608,6 +612,11 @@ Collect parameters for the numerical solution of the model in a `struct`.
     further_compress_critC = eps()  # critical value for eigenvalues for Value functions
     further_compress_critS = ϵ      # critical value for eigenvalues for copula
 
+    # transformation of CDF, to ensure monotonicity and [0,1] bounds
+    transf_CDF = LinearTransformation() # options: ParetoTransformation() or LinearTransformation()
+    start_pareto_threshold::Float64 = eps() # threshold for starting pareto transformation
+    end_pareto_threshold::Float64 = 1.0e-8 # threshold for ending pareto transformation
+
     # Parameters that will be overwritten in the code
     aggr_names::Array{String,1} = ["Something"] # Placeholder for names of aggregates
     distr_names::Array{String,1} = ["Something"] # Placeholder for names of distributions
@@ -642,7 +651,11 @@ Collect parameters for the numerical solution of the model in a `struct`.
     frac_workers::Float64 = (1.0 / (1.0 - (Π^1000)[1, end]))     # stationary equilibrium fraction workers
 
     # initial gues for stationary distribution (needed if iterative procedure is used)
-    dist_guess::Array{Float64,3} = ones(nb, nk, nh) / (nb * nk * nh)
+    dist_guess::Array{Float64} = if isa(model, TwoAsset)
+        ones(nb, nk, nh) / (nb * nk * nh)
+    else
+        ones(nb, nh) / (nb * nh)
+    end
 
     # grid illiquid assets:
     grid_k::Array{Float64,1} =
@@ -653,9 +666,15 @@ Collect parameters for the numerical solution of the model in a `struct`.
         exp.(range(0; stop = log(bmax - bmin + 1.0), length = nb)) .+ bmin .- 1.0
 
     # meshes for income, liquid and illiquid assets
-    mesh_h::Array{Float64,3} = repeat(reshape(grid_h, (1, 1, nh)); outer = [nb, nk, 1])
-    mesh_b::Array{Float64,3} = repeat(reshape(grid_b, (nb, 1, 1)); outer = [1, nk, nh])
-    mesh_k::Array{Float64,3} = repeat(reshape(grid_k, (1, nk, 1)); outer = [nb, 1, nh])
+    mesh_h::AbstractArray{Float64} =
+        isa(model, TwoAsset) ? repeat(reshape(grid_h, (1, 1, nh)); outer = (nb, nk, 1)) :
+        repeat(reshape(grid_h, (1, nh)); outer = (nb, 1))
+    mesh_b::AbstractArray{Float64} =
+        isa(model, TwoAsset) ? repeat(reshape(grid_b, (nb, 1, 1)); outer = (1, nk, nh)) :
+        repeat(reshape(grid_b, (nb, 1)); outer = (1, nh))
+    mesh_k::AbstractArray{Float64} =
+        isa(model, TwoAsset) ? repeat(reshape(grid_k, (1, nk, 1)); outer = (nb, 1, nh)) :
+        repeat(reshape(grid_k, (nk, 1)); outer = (1, nh))
 
     # grid for copula marginal distributions
     copula_marginal_b::Array{Float64,1} =

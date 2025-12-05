@@ -18,7 +18,7 @@ corresponding variable needs to be in the list of states or controls.
 ## Taxation -------------------------------------------------------------------------------
 
 # Mass of households in each productivity state, distribution is (nb, nk, nh)
-distr_h = sum(distrSS; dims = (1, 2))
+distr_h = get_PDF_h(distr)
 
 ## ----------------------------------------------------------------------------------------
 ## Aggregate equations

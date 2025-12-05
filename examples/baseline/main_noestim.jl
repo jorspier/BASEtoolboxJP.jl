@@ -36,7 +36,6 @@ BASEforHANK.LinearAlgebra.BLAS.set_num_threads(Threads.nthreads());
 ## ------------------------------------------------------------------------------------------
 
 m_par = ModelParameters();
-e_set = BASEforHANK.e_set;
 
 @set! m_par.ξ = 4.0;
 @set! m_par.γ = 2.0;
@@ -116,8 +115,7 @@ Bgov = exp.(sr_full.XSS[sr_full.indexes.BgovSS]);
 Y = exp.(sr_full.XSS[sr_full.indexes.YSS]);
 T10W = exp(sr_full.XSS[sr_full.indexes.TOP10WshareSS]);
 G = exp.(sr_full.XSS[sr_full.indexes.GSS]);
-distr_b = sum(sr_full.distrSS; dims = (2, 3))[:];
-fr_borr = sum(distr_b[sr_full.n_par.grid_b .< 0]);
+fr_borr = BASEforHANK.eval_cdf(sr_full.distrSS, :b, sr_full.n_par, 0.0);
 
 # Display steady state moments
 @printf "\n"
@@ -155,6 +153,9 @@ exovars = [getfield(sr_full.indexes, shock_names[i]) for i = 1:length(shock_name
 stds = [getfield(sr_full.m_par, Symbol("σ_", i)) for i in shock_names];
 
 # Compute IRFs
+transform_elements =
+    transformation_elements(sr_full, sr_full.n_par.model, sr_full.n_par.distribution_states); # Γ, DC, IDC, DCD, IDCD
+
 IRFs, _, IRFs_order, IRFs_dist = compute_irfs(
     exovars,
     lr_full.State2Control,
@@ -164,7 +165,9 @@ IRFs, _, IRFs_order, IRFs_dist = compute_irfs(
     init_val = stds,
     distribution = true,
     comp_ids = sr_full.compressionIndexes,
+    transform_elements = transform_elements,
     n_par = sr_full.n_par,
+    m_par = sr_full.m_par,
 );
 
 # Compute variance decomposition of IRFs

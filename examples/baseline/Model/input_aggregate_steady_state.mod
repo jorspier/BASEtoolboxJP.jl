@@ -45,14 +45,14 @@ ISS = m_par.δ_0 * KSS
 # financial market
 LPSS = RKSS / (RBSS / πSS)
 LPXASS = LPSS
-BDSS = -sum(distr_bSS .* (n_par.grid_b .< 0) .* n_par.grid_b)
+BDSS = -aggregate_asset(distrSS, :b, n_par, 0.0)
 qΠSS = (m_par.ωΠ .* Π_FSS) ./ (RBSS / πSS .- 1 .+ m_par.ιΠ) + 1.0
 BgovSS = BSS .- qΠSS .+ 1.0
 TotalAssetsSS = BSS + qSS * KSS
 
 # fiscal side
 RK_before_taxesSS = ((RKSS - 1.0) ./ (1.0 - (TkSS - 1.0))) + 1.0
-TRSS = transfer_scheme(n_par, m_par, args_hh_prob; distr_h = distr_hSS)
+TRSS = transfer_scheme(n_par, m_par, args_hh_prob; distr_h = distrSS.h)
 
 # other definitions
 τprogSS = TprogSS .- 1.0

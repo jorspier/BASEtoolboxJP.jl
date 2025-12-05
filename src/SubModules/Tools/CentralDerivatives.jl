@@ -41,7 +41,7 @@ end
 
 Calculate the approximate derivative of the array `y` with respect to the array `x` along
 the specified dimension(s) `dims` using central differences (cf.
-[`Tools.centraldiff()`](@ref)).
+[`BASEforHANK.Tools.centraldiff()`](@ref)).
 
 # Arguments
 

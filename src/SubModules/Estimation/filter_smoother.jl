@@ -1,24 +1,24 @@
-# contains
-# - kalman_filter
-# - kalman_filter_smoother
-# - kalman_filter_herbst
-# - nearest_spd
+"""
+    kalman_filter(H, LOM, Data, D_miss, SCov, MCov, e_set)
 
-@doc raw"""
-    kalman_filter(H,LOM,Data,D_miss,SCov,MCov,e_set)
+Compute the log-likelihood of `Data` by applying the Kalman filter to the state-space
+representation (`H`, `LOM`) of the model.
 
-Compute likelihood of `Data`, applying the Kalman filter to the state-space represenation (`H`,`LOM`)
-of the model.
+This docstring covers all `kalman_filter` methods, with and without missing data.
 
 # Arguments
-- `H::Array{Float64,2}`: observation equation
-- `LOM::Array{Float64,2}`: law of motion for states
-- `Data::Array{Union{Missing,Float64},2}`,`D_miss::BitArray{2}`: data (time ``\times`` variable); marker for missing data
-- `SCov::Array{Float64,2}`: covariance of structural shocks
-- `MCov::Array{Float64,2}`: covariance of measurement error
+
+  - `H::AbstractMatrix`: observation matrix (maps states to observed variables)
+  - `LOM::AbstractMatrix`: state transition (law of motion) matrix
+  - `Data`: data matrix with observations (time × variable); may contain `missing`
+  - `D_miss`/`D_nomiss::BitArray{2}`: mask for missing/available observations by time and variable
+  - `SCov::AbstractMatrix`: covariance of structural shocks
+  - `MCov::AbstractMatrix`: covariance of measurement errors
+  - `e_set`: estimation settings (e.g., `debug_print` flag)
 
 # Returns
-- log-likelihood
+
+  - `loglik::Float64`: the (Gaussian) log-likelihood of `Data` given the model
 """
 function kalman_filter(
     H::Matrix{Float64},
@@ -179,42 +179,65 @@ function kalman_filter(
     return loglik
 end
 
+"""
+    symmetric_square(Z, SIG)
+
+Compute `Z * SIG * Z'` and return the result as a new matrix.
+
+Intended for symmetric covariance updates inside the Kalman recursions.
+"""
 function symmetric_square(Z, SIG)
     ZS = BLAS.symm('R', 'U', 1.0, SIG, Z)
     ZSIGZ = BLAS.gemm('N', 'T', ZS, Z)
     return ZSIGZ
 end
+
+"""
+    symmetric_square!(Z, SIG, OUT, ZS)
+
+In-place version of `symmetric_square`. Computes `OUT .= Z * SIG * Z'` using preallocated
+work arrays `OUT` and `ZS`.
+"""
 function symmetric_square!(Z, SIG, OUT, ZS)
     BLAS.symm!('R', 'U', 1.0, SIG, Z, 0.0, ZS)
     BLAS.gemm!('N', 'T', 1.0, ZS, Z, 1.0, OUT)
     return OUT
 end
+
+"""
+    symmetric_square0!(Z, SIG, OUT, ZS)
+
+Variant of `symmetric_square!` that overwrites `OUT` (no accumulation). Computes `OUT .= Z * SIG * Z'` using preallocated work arrays.
+"""
 function symmetric_square0!(Z, SIG, OUT, ZS)
     BLAS.symm!('R', 'U', 1.0, SIG, Z, 0.0, ZS)
     BLAS.gemm!('N', 'T', 1.0, ZS, Z, 0.0, OUT)
     return OUT
 end
 
-@doc raw"""
+"""
     kalman_filter_smoother(H, LOM, Data, D_nomiss, SCov, MCov, e_set)
 
 Compute likelihood and estimate of underlying states given the full observed `Data` by
 applying the Kalman smoother to the state-space representation (`H`,`LOM`) of the model.
 
 # Arguments
-- `H::Array{Float64,2}`: observation equation
-- `LOM::Array{Float64,2}`: law of motion for states
-- `Data::Array{Union{Missing,Float64},2}`,`D_nomiss::BitArray{2}`: data (time ``\times`` variable); marker for existent data
-- `SCov::Array{Float64,2}`: covariance of structural shocks
-- `MCov::Array{Float64,2}`: covariance of measurement error
+
+  - `H::Array{Float64,2}`: observation equation
+  - `LOM::Array{Float64,2}`: law of motion for states
+  - `Data::Array{Union{Missing,Float64},2}`,`D_nomiss::BitArray{2}`: data (time ``\times``
+    variable); marker for existent data
+  - `SCov::Array{Float64,2}`: covariance of structural shocks
+  - `MCov::Array{Float64,2}`: covariance of measurement error
 
 # Returns
-- `log_lik`: log-likelihood
-- `xhat_tgt`,`xhat_tgT`: estimate of underlying states from forward iteration [`xhat_tgt`] and
-    backward iteration [`xhat_tgT`]
-- `Sigma_tgt`,`Sigma_tgT`: estimate of covariance matrices from forward iteration [`Sigma_tgt`]
-    and backward iteration [`Sigma_tgT`]
-- `s`,`m`: smoothed structural shocks [`s`] and measurement errors [`m`]
+
+  - `log_lik`: log-likelihood
+  - `xhat_tgt`,`xhat_tgT`: estimate of underlying states from forward iteration [`xhat_tgt`]
+    and backward iteration [`xhat_tgT`]
+  - `Sigma_tgt`,`Sigma_tgT`: estimate of covariance matrices from forward iteration
+    [`Sigma_tgt`] and backward iteration [`Sigma_tgT`]
+  - `s`,`m`: smoothed structural shocks [`s`] and measurement errors [`m`]
 """
 function kalman_filter_smoother(
     H::Array{Float64,2},
@@ -402,6 +425,35 @@ function kalman_filter(
     return loglik
 end
 
+"""
+        kalman_filter_herbst(Data, LOM, SCov, H, MCov, t0, e_set)
+
+Compute the Gaussian log-likelihood using a steady-state Kalman filter variant that
+iteratively updates gain-related matrices until convergence (per-period fixed-point on
+`Kg`). This follows a formulation akin to steady-state filtering as used in the DSGE
+estimation literature.
+
+# Arguments
+
+    - `Data::AbstractMatrix`: observation matrix (time × variable)
+    - `LOM::AbstractMatrix`: state transition matrix
+    - `SCov::AbstractMatrix`: covariance of structural shocks
+    - `H::AbstractMatrix`: observation matrix
+    - `MCov::AbstractMatrix`: covariance of measurement errors
+    - `t0::Integer`: number of initial observations excluded from the likelihood (burn-in)
+    - `e_set`: estimation settings (uses `debug_print` for error reporting)
+
+# Returns
+
+    - `log_lik::Float64`: (Gaussian) log-likelihood after convergence (or max iterations)
+
+Notes:
+
+  - Ensures symmetry/PD of intermediate covariance matrices and checks determinant signs;
+    returns a large negative likelihood if numerical issues are detected (and
+    `debug_print`).
+  - Convergence criterion is based on `maximum(abs.(Kg - Kg_old)) < tol`.
+"""
 function kalman_filter_herbst(Data, LOM, SCov, H, MCov, t0, e_set)
     tol = 1e-7
     converged = false

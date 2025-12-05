@@ -1,14 +1,47 @@
-@doc raw"""
-    likeli(par, Data, Data_missing, H_sel, priors, meas_error, meas_error_std, sr, lr, m_par, e_set; smoother=false)
-Compute the likelihood of `Data`, given model-parameters `par` and prior `priors` (maximize to find MLE of `par`).
+"""
+    likeli(args...; smoother=false)
 
-Solve model with [`LinearSolution_reduced_system()`](@ref), compute likelihood with [`kalman_filter()`](@ref) or with [`kalman_filter_smoother()`](@ref) (if `smoother==True`).
+Compute the (Gaussian) likelihood of observed data given candidate parameters and priors,
+optionally returning Kalman-smoother outputs.
+
+This docstring covers both methods:
+
+  - `likeli(par, Data, Data_missing, H_sel, priors, meas_error, meas_error_std, sr, lr, m_par, e_set; smoother=false)`
+  - `likeli(par, sr, lr, er, m_par, e_set; smoother=false)` where `er` bundles data, masks,
+    priors, and measurement-error info.
+
+Workflow:
+
+ 1. Evaluate the prior; if violated, set `alarm=true` and return a large negative
+    likelihood.
+ 2. Reconstruct model parameters from `par` and build structural (`SCov`) and measurement
+    (`MCov`) covariances.
+ 3. Solve the reduced linear system via `LinearSolution_reduced_system` (aggregate-only
+    update).
+ 4. Form observation matrix `H = H_sel * [I; State2Control]` and compute the likelihood
+    using `kalman_filter` (filter only) or `kalman_filter_smoother` (if `smoother=true`).
 
 # Returns
-*if `smoother==False`:*
-- `log_like`,`prior_like`,`post_like`,`alarm`: log-likelihoods (`post` is the sum of `prior` and computed likelihood); `alarm` indicates error when solving model with [`LinearSolution_reduced_system`](@ref), sets log-likelihood to `-9.e15`
-*if `smoother==True`:*
-- `smoother_output`: returns from [`kalman_filter_smoother()`](@ref)
+
+  - If `smoother == false`:
+
+      + `log_like::Float64`: data log-likelihood
+      + `prior_like::Float64`: prior log-density
+      + `post_like::Float64`: sum of likelihood and prior
+      + `alarm::Bool`: true if prior violated or model solution failed
+      + `State2Control::AbstractMatrix`: the observation mapping `gx` used to build `H`
+
+  - If `smoother == true`:
+
+      + `smoother_output`: a tuple `(log_lik, xhat_tgt, xhat_tgT, Sigma_tgt, Sigma_tgT, s, m)` from `kalman_filter_smoother`
+
+Notes:
+
+  - Measurement-error treatment is governed by `e_set.me_treatment`:
+
+      + `:fixed` uses `meas_error_std` to set diagonal entries of `MCov` at positions in
+        `meas_error`.
+      + otherwise, measurement-error stds are read from the tail of `par` in the same order.
 """
 function likeli(
     par,
@@ -40,19 +73,6 @@ function likeli(
     )
 end
 
-@doc raw"""
-    likeli(par, sr, lr, er, m_par, e_set; smoother=false)
-Compute the likelihood of `er.Data`, given model-parameters `par` and prior `er.priors` (maximize to find MLE of `par`).
-
-Solve model with [`LinearSolution_reduced_system()`](@ref), compute likelihood with [`kalman_filter()`](@ref) or with [`kalman_filter_smoother()`](@ref) (if `smoother==True`).
-
-# Returns
-*if `smoother==False`:*
-- `log_like`,`prior_like`,`post_like`,`alarm`: log-likelihoods (`post` is the sum of `prior` and computed likelihood); `alarm` indicates error when solving model with [`LinearSolution_reduced_system`](@ref), sets log-likelihood to `-9.e15`
-*if `smoother==True`:*
-- `smoother_output`: returns from [`kalman_filter_smoother()`](@ref)
-- `State2Control`,`LOM`: state-to-control and state transition matrizzes
-"""
 function likeli(par, sr, lr, er, m_par, e_set; smoother = false)
     return likeli_backend(
         par,
@@ -70,6 +90,13 @@ function likeli(par, sr, lr, er, m_par, e_set; smoother = false)
     )
 end
 
+"""
+    likeli_backend(par, Data, Data_missing, H_sel, priors, meas_error, meas_error_std, sr, lr, m_par, e_set, smoother)
+
+Implementation of `likeli` shared by both entry-point methods. See `likeli` for high-level
+behavior. This function returns either the five-tuple in the filter-only case or the full
+smoother output when `smoother=true`.
+"""
 function likeli_backend(
     par,
     Data,
@@ -166,18 +193,21 @@ function likeli_backend(
     end
 end
 
-@doc raw"""
-    prioreval(par,priors)
+"""
+    prioreval(par, priors)
 
-Evaluate prior PDF at the parameters given in `par`.
+Evaluate the joint prior density at parameters `par` using Distributions.jl.
 
 # Arguments
-- `par`: vector of parameters [npar*1]
-- `priors`: vector of prior distributions [npar*1]
+
+  - `par::Tuple` or vector: parameter values
+  - `priors::Tuple` or vector: matching prior distributions
 
 # Returns
-- `log_priorval`: log prior density [scalar]
-- `alarm`: indicator that is 1 if there is a violation of the prior bounds [scalar]
+
+  - `log_priorval::Float64`: sum of log-densities if all `par[i] ∈ support(priors[i])`,
+    otherwise `-9e15`
+  - `alarm::Bool`: `true` if any parameter lies outside its prior support
 """
 function prioreval(par, priors)
     if all(insupport.(priors, par))

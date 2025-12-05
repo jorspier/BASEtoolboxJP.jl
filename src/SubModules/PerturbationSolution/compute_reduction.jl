@@ -1,14 +1,34 @@
-@doc raw"""
+"""
     compute_reduction(sr, lr, m_par, shock_names)
 
-Finds the coefficients of the Chebyshev Polynomials obtained from the DCTs of marginal value functions and copulas that are most volatile over the business cycle.
-Thereby, it allows to reduce the number of state and control variables required to describe the heterogeneous agent part of the model.
-This improves the speed of estimation without losing much of the approximation quality.
+Compute the second-stage model reduction using Principal Component Analysis (PCA) on the
+covariance matrices of the linearized model's states and controls.
+
+This function identifies the linear combinations of the first-stage variables (DCT
+coefficients of marginal value functions and distributions) that contribute most to the
+model's volatility over the business cycle. It constructs projection matrices (`PRightAll`,
+`PRightStates`) to project the full system onto this reduced subspace, significantly
+reducing the number of state and control variables for estimation while maintaining
+approximation quality.
+
+# Arguments
+
+  - `sr`: Steady state results containing indices and parameters.
+  - `lr`: Initial linear solution (first-stage reduction) used to compute long-run
+    covariances.
+  - `m_par`: Model parameters (used for shock variances).
+  - `shock_names`: Vector of symbols denoting the shocks to include in the covariance
+    calculation.
 
 # Returns
-- `compressionIndexes`: retained DCT coefficients (stored in an array of arrays)
-- `indexes`: indexes that translate variable names to positions in arrays
-- `n_par`: numerical parameters (changed number of states and controls)
+
+  - `indexes_r`: Structure containing indices for the reduced model variables.
+
+  - `n_par`: Updated numerical parameters object containing:
+
+      + Reduced dimensions (`nstates_r`, `ncontrols_r`, `ntotal_r`).
+      + Projection matrices (`PRightAll`, `PRightStates`) mapping full variables to reduced
+        factors.
 """
 function compute_reduction(sr, lr, m_par, shock_names)
 
@@ -38,13 +58,13 @@ function compute_reduction(sr, lr, m_par, shock_names)
     # evalS, evecS = eigen(StateCOVAR[Dindex,Dindex])
     # println(sum(abs.(evalS).> maximum(evalS)*n_par.further_compress_critS))
 
-    Dindex = sr.indexes.COP
+    Dindex = get_Dindex(sr.indexes.distr)
     evalS, evecS = eigen(StateCOVAR[Dindex, Dindex])
     keepD = abs.(evalS) .> maximum(evalS) * n_par.further_compress_critS
     indKeepD = Dindex[keepD]
     @set! n_par.nstates_r = n_par.nstates - length(Dindex) + length(indKeepD)
 
-    Vindex = [sr.indexes.Wb; sr.indexes.Wk]
+    Vindex = [sr.indexes.valueFunction.b; sr.indexes.valueFunction.k]
     evalC, evecC = eigen(ControlCOVAR[Vindex .- n_par.nstates, Vindex .- n_par.nstates])
     keepV = abs.(evalC) .> maximum(evalC) * n_par.further_compress_critC
     indKeepV = Vindex[keepV]
@@ -68,27 +88,30 @@ function compute_reduction(sr, lr, m_par, shock_names)
     keep[Vindex[.!keepV]] .= false
     # @set! n_par.PRightAll        = PRightAll_aux[:,keep]
     Aux = PRightAll_aux[:, keep]
-    indexes_r = produce_indexes(n_par, keepV[keepV][1:2], keepV[keepV][3:end], keepD[keepD]) # arbitrary splitup of underlying factors from value functions to indexes in reduced model
+    # TODO: Here, we have to adjust the indexes to the new version with both value function indices in one vector – similar to prepare_linearization! DONE, but move to a function?
+    indexes_r =
+        produce_indexes(n_par, [keepV[keepV][1:2], keepV[keepV][3:end]], keepD[keepD]) # arbitrary splitup of underlying factors from value functions to indexes in reduced model
     @set! n_par.ntotal_r = n_par.nstates_r + n_par.ncontrols_r
 
+    # TODO: This is highly order sensitive, I have adjusted it but we need to make this work for all solution methods – move to a function?
     block = Array{Vector}(undef, 5)
     block_r = Array{Vector}(undef, 5)
     indexes = sr.indexes
-    block[1] = [indexes.distr_b; indexes.distr_k; indexes.distr_h]
-    block[3] = (indexes.COP[end] + 1):(indexes.Wb[1] - 1)
-    block[2] = indexes.COP
-    block[4] = [indexes.Wb; indexes.Wk]
-    block[5] = (indexes.Wk[end] + 1):(n_par.ntotal)
-    block_r[1] = [indexes_r.distr_b; indexes_r.distr_k; indexes_r.distr_h]
-    block_r[3] = (indexes_r.COP[end] + 1):(indexes_r.Wb[1] - 1)
-    block_r[2] = indexes_r.COP
-    block_r[4] = [indexes_r.Wb; indexes_r.Wk]
-    block_r[5] = (indexes_r.Wk[end] + 1):(n_par.ntotal_r)
-    RedCOP = Aux[block[2], block_r[2]]
+    block[1] = indexes.distr.COP
+    block[2] = [indexes.distr.b; indexes.distr.k; indexes.distr.h]
+    block[3] = (indexes.distr.h[end] + 1):(indexes.valueFunction.b[1] - 1)
+    block[4] = [indexes.valueFunction.b; indexes.valueFunction.k]
+    block[5] = (indexes.valueFunction.k[end] + 1):(n_par.ntotal)
+    block_r[1] = indexes_r.distr.COP
+    block_r[2] = [indexes_r.distr.b; indexes_r.distr.k; indexes_r.distr.h]
+    block_r[3] = (indexes_r.distr.h[end] + 1):(indexes_r.valueFunction.b[1] - 1)
+    block_r[4] = [indexes_r.valueFunction.b; indexes_r.valueFunction.k]
+    block_r[5] = (indexes_r.valueFunction.k[end] + 1):(n_par.ntotal_r)
+    RedCOP = Aux[block[1], block_r[1]]
     RedVs = Aux[block[4], block_r[4]]
     @set! n_par.PRightAll = BlockDiagonal([
-        diagm(ones(length(block[1]))),    # mapping from marginal dist to marginal dist
         RedCOP,                         # compression for copula
+        diagm(ones(length(block[2]))),    # mapping from marginal dist to marginal dist
         diagm(ones(length(block[3]))),  # mapping aggr states to aggr states
         RedVs,                          # compression for value functions
         diagm(ones(length(block[5]))),

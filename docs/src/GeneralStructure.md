@@ -9,7 +9,7 @@ The folder of each example typically consists of the following:
 - `input_aggregate_names.jl`: contains the naming of the variables, in particular, which variables are states, choices, and shocks is specified here.
 - `input_aggregate_steady_state.mod`: contains the equations for the steady state of the model.
 - `input_compute_args_hh_prob_ss.jl`: provides the function that computes the arguments of the household problem in the steady state.
-- `input_functions.jl`: contains the functions that can be user specified. CAN THE INPUTS BE CHANGED?
+- `input_functions.jl`: contains the functions that can be user specified.
 - `input_parameters.jl`: specifies the parameters. Keep in mind that you cannot take out parameters for the household model part.
 
 `Data/`: Contains some data used in the baseline for the estimation. If you are not interested in estimation, this folder is not strictly required.
@@ -88,7 +88,7 @@ F[equation_number] = (lhs) - (rhs)
 where the `equation_number` is based on a variable-specific index, following the pattern `indexes.<variable_name>`. The `<variable_name>` must be unique, i.e. each `equation_number` is used only once.
 
 !!! danger
-    The variables defined in `args_hh_prob_names` must exist as variables throughout the model, i.e. they must be defined (though possibly implicitly) in `input_aggregate_model.mod`.
+    The variables defined in `args_hh_prob_names` must exist as variables throughout the model, so they also must be defined (though often implicitly) in `input_aggregate_model.mod`.
 
 #### Lags and leads
 

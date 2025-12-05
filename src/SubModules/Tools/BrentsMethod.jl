@@ -1,4 +1,4 @@
-@doc raw"""
+"""
     Brent(g::Function, a::Real, b::Real; tol = 1e-14)
 
 Find the root of a function using Brent's method, a combination of the bisection, secant,
@@ -9,25 +9,29 @@ This implementation solves for a root of the function `g(z)`, where the function
 implementation follows wikipedia.
 
 # Arguments
-- `g::Function`: The function for which the root is being found. It should return a value
+
+  - `g::Function`: The function for which the root is being found. It should return a value
     that can be indexed, where the first element (`g(z)[1]`) represents the function value
     at `z`.
-- `a::Real`: The lower bound of the interval where the root is located.
-- `b::Real`: The upper bound of the interval where the root is located.
-- `tol::Real`: The tolerance for convergence. The default is `1e-14`.
+  - `a::Real`: The lower bound of the interval where the root is located.
+  - `b::Real`: The upper bound of the interval where the root is located.
+  - `tol::Real`: The tolerance for convergence. The default is `1e-14`.
 
 # Returns
-- `b::Real`: The estimated root of the function.
-- `iter::Int`: The number of iterations used to find the root.
+
+  - `b::Real`: The estimated root of the function.
+  - `iter::Int`: The number of iterations used to find the root.
 
 # Errors
-- Throws an error if the function values at `a` and `b` have the same sign, indicating no
-  root exists in the specified interval.
+
+  - Throws an error if the function values at `a` and `b` have the same sign, indicating no
+    root exists in the specified interval.
 
 # Example
+
 ```julia
-    g(x) = x^2 - 2
-    root, iterations = Brent(g, 0, 2)
+g(x) = x^2 - 2
+root, iterations = Brent(g, 0, 2)
 ```
 """
 function Brent(g::Function, a::Real, b::Real; tol = 1e-14)
@@ -116,7 +120,7 @@ function Brent(g::Function, a::Real, b::Real; tol = 1e-14)
     return b, iter
 end
 
-@doc raw"""
+"""
     CustomBrent(f::Function, a::Real, b::Real; tol = 1e-14)
 
 Find the root of a function using a customized version of Brent's method. This
@@ -127,28 +131,33 @@ The function is designed for cases where the root-finding process needs to accou
 additional parameters beyond the function's value at the endpoints.
 
 # Arguments
-- `f::Function`: The function for which the root is being found. It should return a tuple,
-  where the first element (`f(z)[1]`) represents the function value at `z`, and the
-  subsequent elements represent additional parameters used for interpolation.
-- `a::Real`: The lower bound of the interval where the root is located.
-- `b::Real`: The upper bound of the interval where the root is located.
-- `tol::Real`: The tolerance for convergence. The default is `1e-14`.
+
+  - `f::Function`: The function for which the root is being found. It should return a tuple,
+    where the first element (`f(z)[1]`) represents the function value at `z`, and the
+    subsequent elements represent additional parameters used for interpolation.
+  - `a::Real`: The lower bound of the interval where the root is located.
+  - `b::Real`: The upper bound of the interval where the root is located.
+  - `tol::Real`: The tolerance for convergence. The default is `1e-14`.
 
 # Returns
-- `b::Real`: The estimated root of the function.
-- `iter::Int`: The number of iterations used to find the root.
-- `fb::Tuple`: The function value at the root, along with any interpolated parameters.
+
+  - `b::Real`: The estimated root of the function.
+  - `iter::Int`: The number of iterations used to find the root.
+  - `fb::Tuple`: The function value at the root, along with any interpolated parameters.
 
 # Errors
-- Throws an error if the function values at `a` and `b` have the same sign, indicating no
-  root exists in the specified interval.
+
+  - Throws an error if the function values at `a` and `b` have the same sign, indicating no
+    root exists in the specified interval.    # Implementation of Brent's method to find a root of a function (as on wikipedia)
 """
 function CustomBrent(f::Function, a::Real, b::Real; tol = 1e-14)
     # Implementation of Brent's method to find a root of a function (as on wikipedia)
     fa = f(a)
-    fb = f(b, true, fa[2], fa[3], fa[4])
+    fb = f(b, true, fa[2], fa[3])
     if fa[1] * fb[1] > 0
-        error("f[a] and f[b] should have different signs!")
+        error(
+            "f[a] and f[b] should have different signs, but f[a] = $(fa[1]), f[b] = $(fb[1]) with a = $a, b = $b",
+        )
     end
 
     c = a
@@ -226,9 +235,8 @@ function CustomBrent(f::Function, a::Real, b::Real; tol = 1e-14)
         fb = f(
             b,
             initial,
-            (fa[2] .+ d / (c - a) .* (fc[2] - fa[2])),
+            [fa[2][i] .+ d / (c - a) .* (fc[2][i] - fa[2][i]) for i = 1:length(fa[2])],
             (fa[3] .+ d / (c - a) .* (fc[3] - fa[3])),
-            (fa[4] .+ d / (c - a) .* (fc[4] - fa[4])),
         )
     end
     return b, iter, fb

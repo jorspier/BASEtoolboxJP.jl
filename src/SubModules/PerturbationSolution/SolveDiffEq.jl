@@ -1,22 +1,39 @@
-@doc raw"""
-    SolveDiffEq(A, B, n_par; allow_approx_sol)
+"""
+    SolveDiffEq(A, B, n_par; allow_approx_sol=true)
 
 Calculate the solution to the linearized difference equations defined as
-P'*B*P x_t = P'*A*P x_{t+1}, where `P` is the (ntotal x r) semi-unitary model reduction matrix
-`n_par.PRightAll` of potentially reduced rank r.
+
+`P'*B*P x_t = P'*A*P x_{t+1}`,
+
+where `P` is the (ntotal x r) semi-unitary model reduction matrix `n_par.PRightAll` of
+potentially reduced rank r.
+
+This function solves the system for the observation equations `d_t = gx * k_t` and state
+transition equations `k_{t+1} = hx * k_t`.
 
 # Arguments
-- `A`,`B`: matrices with first derivatives
-- `n_par::NumericalParameters`: `n_par.sol_algo` determines
-    the solution algorithm, options are:
-    * `litx`:  Linear time iteration (implementation follows Reiter)
-    * `schur`: Klein's algorithm (preferable if number of controls is small)
-- `allow_approx_sol`: if `true` approximate solutions are allowed if the system is not unique and determinate
+
+  - `A`,`B`: Matrices with first derivatives of the equilibrium conditions with respect to
+    `XPrime` (`A`) and `X` (`B`).
+
+  - `n_par`: Numerical parameters structure (`NumericalParameters`). `n_par.sol_algo`
+    determines the solution algorithm. Options are:
+
+      + `:lit`: Linear time iteration (implementation follows Reiter).
+      + `:litx`: Optimized Linear time iteration (Reiter + QR + Howard-style improvement).
+      + `:schur`: Klein's algorithm (based on generalized Schur decomposition, default).
+        Preferable if the number of controls is small.
+  - `allow_approx_sol`: Keyword, `Bool` (default `true`). If `true`, approximate solutions
+    are allowed if the system is not unique and determinate (e.g., critical eigenvalues are
+    shifted).
 
 # Returns
-- `gx`,`hx`: observation equations [`gx`] and state transition equations [`hx`]
-- `alarm_LinearSolution`,`nk`: `alarm_LinearSolution=true` when solving algorithm fails, `nk` number of
-    predetermined variables
+
+  - `gx`: Observation equations matrix (mapping states to controls).
+  - `hx`: State transition equations matrix (mapping states to future states).
+  - `alarm_LinearSolution`: `Bool`. `true` when the solving algorithm fails or the solution
+    is indeterminate.
+  - `nk`: Number of predetermined variables (states) found by the solver.
 """
 function SolveDiffEq(Ainput::Array, Binput::Array, n_par, allow_approx_sol = true)
     lit_fail = false

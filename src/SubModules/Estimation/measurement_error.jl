@@ -1,17 +1,35 @@
-@doc raw"""
-    measurement_error(Data,observed_vars,e_set)
+"""
+    measurement_error(Data, observed_vars, e_set)
 
-Build measurement error.
+Construct the measurement-error specification from user settings and data.
+
+Maps each observable listed in `e_set.meas_error_input` to its column index in
+`observed_vars`, and builds corresponding priors and standard-deviation caps according to
+`e_set.me_treatment`.
 
 # Arguments
-- `Data`: matrix of observables [nobs * nvar]
-- `observed_vars`: vector of observed variable names [nvar * 1]
-- `e_set::EstimationSettings`
+
+  - `Data::AbstractMatrix`: observed data matrix of size `nobs × nvar`
+  - `observed_vars::AbstractVector{Symbol}`: names of observables, length `nvar`
+  - `e_set::EstimationSettings`: estimation settings controlling measurement errors
 
 # Returns
-- `meas_error`: ordered dictionary of measurement errors linked to observables
-- `meas_error_prior`: corresponding priors for measurement errors
-- `meas_error_std`: standard deviations of observables with measurement error
+
+  - `meas_error::OrderedDict{Symbol,Int}`: mapping from observable names to their column
+    index
+  - `meas_error_prior::Vector{<:Distribution}`: prior distributions for measurement-error
+    stds
+  - `meas_error_std::Vector{Float64}`: per-observable std caps (used when `me_treatment ∈ (:bounded, :fixed)`) or defaults
+
+Treatment modes (`e_set.me_treatment`):
+
+  - `:unbounded`: uses `e_set.meas_error_distr` (e.g., inverse-gamma) as priors and sets
+    `meas_error_std .= e_set.me_std_cutoff` (a neutral scaling anchor).
+  - `:bounded` or `:fixed`: sets a data-driven upper bound for each selected observable as
+    `UB_j = e_set.me_std_cutoff * std(skipmissing(Data[:, j]))` and assigns `Uniform(0, UB_j)` priors. For `:fixed`, these caps are later used directly as fixed stds.
+
+If `e_set.meas_error_input` is empty, returns an empty `OrderedDict()`, an empty vector of
+priors, and an empty `Float64[]` for stds.
 """
 function measurement_error(Data, observed_vars, e_set)
     if !isempty(e_set.meas_error_input)

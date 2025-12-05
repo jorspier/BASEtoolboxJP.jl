@@ -27,7 +27,8 @@ export incomes!,
 scale_Hprog(τprog, m_par) = (m_par.γ .+ (m_par.Tprog .- 1.0)) ./ (m_par.γ .+ τprog)
 
 # Scaling for composite good, see eq. (BC with x)
-scale_GHH(τprog, m_par) = (m_par.γ .+ τprog) ./ (1.0 .+ m_par.γ)
+scale_GHH(τprog, m_par, scale::Val{true}) = (m_par.γ .+ τprog) ./ (1.0 .+ m_par.γ)
+scale_GHH(τprog, m_par, scale::Val{false}) = 1.0
 
 # Tax functions, see eq. (Tax func) and text below
 labor_tax_f(x, τlev, τprog, tax_base, scaling::Bool) =

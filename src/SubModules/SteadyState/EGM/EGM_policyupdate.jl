@@ -1,7 +1,6 @@
 """
     EGM_policyupdate(
-        EWbPrime::Array,
-        EWkPrime::Array,
+        vfPrime::ValueFunctions,
         args_hh_prob::Vector,
         net_income::Array,
         n_par,
@@ -10,9 +9,8 @@
         model::Union{CompleteMarkets,OneAsset,TwoAsset},
     )
 
-Find optimal policies, given tomorrows marginal continuation values `EWbPrime`, `EWkPrime`,
-today's prices [`args_hh_prob`], and income [`net_income`], using the Endogenous Grid
-Method.
+Find optimal policies, given tomorrow's marginal continuation values in `vfPrime`, today's
+prices [`args_hh_prob`], and income [`net_income`], using the Endogenous Grid Method.
 
 Optimal policies are defined over the exogenously fixed grid, while values of optimal
 policies (`b` and `k`) can have off-grid values. Please refer to the subsection with the
@@ -23,22 +21,20 @@ household problem'](HouseholdProblem.md).
 
 # Arguments
 
-  - `EWbPrime`, `EWkPrime`: Marginal continuation values of liquid and illiquid assets
+  - `vfPrime`: Tomorrow's marginal value functions (ValueFunctions struct)
   - `args_hh_prob`: Vector of arguments to the household problem
   - `net_income`: Incomes, output of functions from the IncomesETC module
-  - `n_par`, `m_par`
+  - `n_par`: Numerical parameters
+  - `m_par`: Model parameters
   - `warnme`: If `true`, warns about non-monotonicity in resources or liquid asset choices
   - `model`: Model type, either `CompleteMarkets`, `OneAsset`, or `TwoAsset`
 
 # Returns
 
-  - `x_a_star`,`b_a_star`,`k_a_star`,`x_n_star`,`b_n_star`: Optimal (on-grid) policies for
-    the composite [`x`], liquid [`b`] and illiquid [`k`] asset, with [`a`] or without [`n`]
-    adjustment of illiquid asset
+  - `pf`: Optimal policy functions struct containing all policy arrays
 """
 function EGM_policyupdate(
-    EWbPrime::Array,
-    EWkPrime::Array,
+    vfPrime::ValueFunctions,
     args_hh_prob::Vector,
     net_income::Array,
     n_par,
@@ -53,24 +49,19 @@ function EGM_policyupdate(
 
     ## Policy and value functions ---------------------------------------------------------
 
-    nb, nk, nh = size(EWbPrime)
-
-    # Policy functions
-    b_n_star = similar(EWbPrime)
-    b_a_star = similar(EWbPrime)
-    k_a_star = similar(EWbPrime)
-    x_a_star = similar(EWbPrime)
-    x_n_star = similar(EWbPrime)
-
-    # Policy functions on endogenous grid, non-adjustment case
-    x_tilde_n = similar(EWbPrime)
-    b_tilde_n = similar(EWbPrime)
+    pf = if isa(model, TwoAsset)
+        PolicyFunctionsTwoAssets{typeof(vfPrime.b)}(vfPrime.b)
+    elseif isa(model, OneAsset)
+        PolicyFunctionsOneAsset{typeof(vfPrime.b)}(vfPrime.b)
+    else
+        PolicyFunctionsCompleteMarkets{typeof(vfPrime.b)}(vfPrime.b)
+    end
 
     # Difference between expected marginal value functions of assets
-    E_return_diff = similar(EWbPrime)
+    E_return_diff = similar(vfPrime.b)
 
     # Marginal utility of the composite
-    EMU = similar(EWbPrime)
+    EMU = similar(vfPrime.b)
 
     ## Resource grid ----------------------------------------------------------------------
 
@@ -81,106 +72,99 @@ function EGM_policyupdate(
 
     # Exogenous grid of non-human resources, calculated based on the equation (resources
     # adjustment) in the documentation
-    R_exo_a =
-        reshape(n_rental_inc .+ liquid_asset_inc .+ capital_liquidation_inc, (nb .* nk, nh))
+    isa(model, OneAsset) && @assert n_par.nk == 1
+    R_exo_a = reshape(
+        n_rental_inc .+ liquid_asset_inc .+ capital_liquidation_inc,
+        (n_par.nb .* n_par.nk, n_par.nh),
+    )
 
     ## ------------------------------------------------------------------------------------
     ## Call the inplace function to update policies
     ## ------------------------------------------------------------------------------------
 
     EGM_policyupdate!(
-        x_a_star,
-        b_a_star,
-        k_a_star,
-        x_n_star,
-        b_n_star,
+        pf,
         E_return_diff,
         EMU,
-        x_tilde_n,
-        b_tilde_n,
         R_exo_a,
-        EWbPrime,
-        EWkPrime,
+        vfPrime,
         args_hh_prob,
         net_income,
         n_par,
         m_par,
         warnme,
-        model,
     )
 
     ## ------------------------------------------------------------------------------------
     ## Return results
     ## ------------------------------------------------------------------------------------
 
-    return x_a_star, b_a_star, k_a_star, x_n_star, b_n_star
+    return pf
 end
 
 """
     EGM_policyupdate!(
-        x_a_star::Array,
-        b_a_star::Array,
-        k_a_star::Array,
-        x_n_star::Array,
-        b_n_star::Array,
+        pf::PolicyFunctions,
         E_return_diff::Array,
         EMU::Array,
-        x_tilde_n::Array,
-        b_tilde_n::Array,
-        EWbPrime::Array,
-        EWkPrime::Array,
+        R_exo_a::Array,
+        EVfPrime::ValueFunctions,
         args_hh_prob::Vector,
         net_income::Array,
         n_par,
         m_par,
         warnme::Bool,
-        model::Union{CompleteMarkets,OneAsset,TwoAsset},
     )
 
-In-place version of [`EGM_policyupdate`](@ref), see that function for details.
+In-place version of [`EGM_policyupdate`](@ref) that updates policy functions directly.
+
+Uses the Endogenous Grid Method to solve for optimal policies given tomorrow's marginal
+value functions. Has specialized methods for different model types (CompleteMarkets,
+OneAsset, TwoAssets).
+
+# Arguments
+
+  - `pf`: Policy functions struct to be updated in-place
+  - `E_return_diff`: Array for storing differences in expected returns
+  - `EMU`: Array for storing marginal utility of consumption
+  - `R_exo_a`: Exogenous resource grid for adjustment case
+  - `EVfPrime`: Tomorrow's expected marginal value functions
+  - `args_hh_prob`: Vector of arguments to the household problem
+  - `net_income`: Incomes from the IncomesETC module
+  - `n_par`: Numerical parameters
+  - `m_par`: Model parameters
+  - `warnme`: If `true`, warns about non-monotonicity issues
+
+# Returns
+
+  - Nothing (modifies `pf` in-place)
 """
 function EGM_policyupdate!(
-    x_a_star::Array,
-    b_a_star::Array,
-    k_a_star::Array,
-    x_n_star::Array,
-    b_n_star::Array,
+    pf::PolicyFunctionsCompleteMarkets,
     E_return_diff::Array,
     EMU::Array,
-    x_tilde_n::Array,
-    b_tilde_n::Array,
     R_exo_a::Array,
-    EWbPrime::Array,
-    EWkPrime::Array,
+    EVfPrime::ValueFunctionsCompleteMarkets,
     args_hh_prob::Vector,
     net_income::Array,
     n_par,
     m_par,
     warnme::Bool,
-    model::CompleteMarkets,
 )
     # Do nothing, complete markets does not require policy update
 end
 
 function EGM_policyupdate!(
-    x_a_star::Array,
-    b_a_star::Array,
-    k_a_star::Array,
-    x_n_star::Array,
-    b_n_star::Array,
+    pf::PolicyFunctionsOneAsset,
     E_return_diff::Array,
     EMU::Array,
-    x_tilde_n::Array,
-    b_tilde_n::Array,
     R_exo_a::Array,
-    EWbPrime::Array,
-    EWkPrime::Array,
+    EVfPrime::ValueFunctionsOneAsset,
     args_hh_prob::Vector,
     net_income::Array,
     n_par,
     m_par,
     warnme::Bool,
-    model::OneAsset,
 )
     @read_args_hh_prob()
 
@@ -189,11 +173,11 @@ function EGM_policyupdate!(
     ## ------------------------------------------------------------------------------------
 
     # Dimensions and discount factor
-    nb, nk, nh = size(EWbPrime)
+    nb, nh = size(EVfPrime.b)
     β::Float64 = m_par.β
 
     # Income components
-    n_labor_union_inc_GHH = net_income[1]
+    net_labor_union_inc = net_income[1] # in case of GHH preferences, adjusted for composite good
     n_rental_inc = net_income[2]
     liquid_asset_inc = net_income[3]
 
@@ -219,86 +203,54 @@ function EGM_policyupdate!(
     =#
 
     # Step i): right-hand-side of Euler equation
-    EMU .= EWbPrime .* β .* (1.0 .+ (Tc .- 1.0))
+    EMU .= EVfPrime.b .* β .* (1.0 .+ (Tc .- 1.0))
 
     # Step ii): optimal composite choice
-    invmutil!(x_tilde_n, EMU, m_par)
+    invmutil!(pf.x_tilde_n, EMU, m_par)
 
     # Step iii): Endogenous grid points for liquid assets, calculated based on the equation
     # (end. grid non-adj.) in the documentation
-    b_tilde_n .= (
-        (1.0 .+ (Tc .- 1.0)) .* x_tilde_n .+ n_par.mesh_b .- n_labor_union_inc_GHH .-
+    pf.b_tilde_n .=
+        (1.0 .+ (Tc .- 1.0)) .* pf.x_tilde_n .+ n_par.mesh_b .- net_labor_union_inc .-
         n_rental_inc
-    )
-    eff_int = RRL .* (b_tilde_n .> 0.0) + RRD .* (b_tilde_n .<= 0.0)
-    b_tilde_n .= b_tilde_n ./ eff_int
+    eff_int = RRL .* (pf.b_tilde_n .> 0.0) + RRD .* (pf.b_tilde_n .<= 0.0)
+    pf.b_tilde_n .= pf.b_tilde_n ./ eff_int
 
     # Check monotonicity of b_tilde_n
     if warnme
-        b_star_aux = reshape(b_tilde_n, (nb, nk * nh))
-        if any(any(diff(b_star_aux; dims = 1) .< 0))
+        if any(any(diff(pf.b_tilde_n; dims = 1) .< 0))
             @warn "Non monotone future liquid asset choice encountered."
         end
     end
 
     # Step iv): interpolate from endogenous grid to fixed grid
-    @inbounds @views begin
-        for jj = 1:nh
-            for kk = 1:nk
+    interpolate_policies_to_fixed!(
+        pf,
+        net_labor_union_inc,
+        n_rental_inc,
+        liquid_asset_inc,
+        Tc,
+        n_par.grid_b,
+        nb,
+        nh,
+        n_par.transition_type;
+        extrapolate = true,
+    )
 
-                # Generate composite and liquid asset policies on fixed grid
-                mylinearinterpolate_mult2!(
-                    x_n_star[:, kk, jj],
-                    b_n_star[:, kk, jj],
-                    b_tilde_n[:, kk, jj],
-                    x_tilde_n[:, kk, jj],
-                    n_par.grid_b,
-                    n_par.grid_b,
-                )
-
-                # Step v): Check for binding borrowing constraints, no extrapolation from
-                # grid
-                bcpol = b_tilde_n[1, kk, jj]
-                for bb = 1:nb
-                    if n_par.grid_b[bb] .< bcpol
-                        x_n_star[bb, kk, jj] =
-                            (
-                                n_labor_union_inc_GHH[bb, kk, jj] .+
-                                n_rental_inc[bb, kk, jj] .+ liquid_asset_inc[bb, kk, jj] .-
-                                n_par.grid_b[1]
-                            ) ./ (1 .+ (Tc .- 1.0))
-                        b_n_star[bb, kk, jj] = n_par.grid_b[1]
-                    end
-                end
-            end
-        end
-    end
-
-    x_a_star .= 0.0
-    b_a_star .= 0.0
-    k_a_star .= 0.0
     E_return_diff .= 0.0
 end
 
 function EGM_policyupdate!(
-    x_a_star::Array,
-    b_a_star::Array,
-    k_a_star::Array,
-    x_n_star::Array,
-    b_n_star::Array,
+    pf::PolicyFunctionsTwoAssets,
     E_return_diff::Array,
     EMU::Array,
-    x_tilde_n::Array,
-    b_tilde_n::Array,
     R_exo_a::Array,
-    EWbPrime::Array,
-    EWkPrime::Array,
+    EVfPrime::ValueFunctionsTwoAssets,
     args_hh_prob::Vector,
     net_income::Array,
     n_par,
     m_par,
     warnme::Bool,
-    model::TwoAsset,
 )
     @read_args_hh_prob()
 
@@ -307,11 +259,11 @@ function EGM_policyupdate!(
     ## ------------------------------------------------------------------------------------
 
     # Dimensions and discount factor
-    nb, nk, nh = size(EWbPrime)
+    nb, nk, nh = size(EVfPrime.b)
     β::Float64 = m_par.β
 
     # Income components
-    n_labor_union_inc_GHH = net_income[1]
+    net_labor_union_inc = net_income[1]
     n_rental_inc = net_income[2]
     liquid_asset_inc = net_income[3]
     capital_liquidation_inc = net_income[4]
@@ -338,23 +290,23 @@ function EGM_policyupdate!(
     =#
 
     # Step i): right-hand-side of Euler equation
-    EMU .= EWbPrime .* β .* (1.0 .+ (Tc .- 1.0))
+    EMU .= EVfPrime.b .* β .* (1.0 .+ (Tc .- 1.0))
 
     # Step ii): optimal composite choice
-    invmutil!(x_tilde_n, EMU, m_par)
+    invmutil!(pf.x_tilde_n, EMU, m_par)
 
     # Step iii): Endogenous grid points for liquid assets, calculated based on the equation
     # (end. grid non-adj.) in the documentation
-    b_tilde_n .= (
-        (1.0 .+ (Tc .- 1.0)) .* x_tilde_n .+ n_par.mesh_b .- n_labor_union_inc_GHH .-
+    pf.b_tilde_n .=
+        (1.0 .+ (Tc .- 1.0)) .* pf.x_tilde_n .+ n_par.mesh_b .- net_labor_union_inc .-
         n_rental_inc
-    )
-    eff_int = RRL .* (b_tilde_n .> 0.0) + RRD .* (b_tilde_n .<= 0.0)
-    b_tilde_n .= b_tilde_n ./ eff_int
+
+    eff_int = RRL .* (pf.b_tilde_n .> 0.0) + RRD .* (pf.b_tilde_n .<= 0.0)
+    pf.b_tilde_n .= pf.b_tilde_n ./ eff_int
 
     # Check monotonicity of b_tilde_n
     if warnme
-        b_star_aux = reshape(b_tilde_n, (nb, nk * nh))
+        b_star_aux = reshape(pf.b_tilde_n, (nb, nk * nh))
         if any(any(diff(b_star_aux; dims = 1) .< 0))
             @warn "Non monotone future liquid asset choice encountered."
         end
@@ -367,26 +319,26 @@ function EGM_policyupdate!(
 
                 # Generate composite and liquid asset policies on fixed grid
                 mylinearinterpolate_mult2!(
-                    x_n_star[:, kk, jj],
-                    b_n_star[:, kk, jj],
-                    b_tilde_n[:, kk, jj],
-                    x_tilde_n[:, kk, jj],
+                    pf.x_n_star[:, kk, jj],
+                    pf.b_n_star[:, kk, jj],
+                    pf.b_tilde_n[:, kk, jj],
+                    pf.x_tilde_n[:, kk, jj],
                     n_par.grid_b,
                     n_par.grid_b,
                 )
 
                 # Step v): Check for binding borrowing constraints, no extrapolation from
                 # grid
-                bcpol = b_tilde_n[1, kk, jj]
+                bcpol = pf.b_tilde_n[1, kk, jj]
                 for bb = 1:nb
                     if n_par.grid_b[bb] .< bcpol
-                        x_n_star[bb, kk, jj] =
+                        pf.x_n_star[bb, kk, jj] =
                             (
-                                n_labor_union_inc_GHH[bb, kk, jj] .+
+                                net_labor_union_inc[bb, kk, jj] .+
                                 n_rental_inc[bb, kk, jj] .+ liquid_asset_inc[bb, kk, jj] .-
                                 n_par.grid_b[1]
                             ) ./ (1 .+ (Tc .- 1.0))
-                        b_n_star[bb, kk, jj] = n_par.grid_b[1]
+                        pf.b_n_star[bb, kk, jj] = n_par.grid_b[1]
                     end
                 end
             end
@@ -433,7 +385,7 @@ function EGM_policyupdate!(
     =#
 
     # Step i) difference between expected marginal value functions of assets
-    E_return_diff .= ((EWkPrime ./ q) .- EWbPrime)
+    E_return_diff .= ((EVfPrime.k ./ q) .- EVfPrime.b)
 
     # Step ii): find optimal choice of liquid assets b' for each combination of k' and h
     # This returns an array b'*(k',h) with off-grid values
@@ -530,7 +482,7 @@ function EGM_policyupdate!(
     # grid adj.) in the documentation
     R_tilde_a =
         (1.0 .+ (Tc .- 1.0)) .* x_tilde_a .+ b_hat_a .+ capital_liquidation_inc[1, :, :] .-
-        n_labor_union_inc_GHH[1, :, :]
+        net_labor_union_inc[1, :, :]
 
     #=
 
@@ -570,10 +522,10 @@ function EGM_policyupdate!(
     # Step iv): choice for when illiquid asset holdings are constrained
 
     # Create lists to store composite, resources, liquid asset and illiquid assets choices
-    cons_list = Array{Array{eltype(x_tilde_n)}}(undef, nh, 1)
-    res_list = Array{Array{eltype(x_tilde_n)}}(undef, nh, 1)
-    liq_list = Array{Array{eltype(x_tilde_n)}}(undef, nh, 1)
-    cap_list = Array{Array{eltype(x_tilde_n)}}(undef, nh, 1)
+    cons_list = Array{Array{eltype(pf.x_tilde_n)}}(undef, nh, 1)
+    res_list = Array{Array{eltype(pf.x_tilde_n)}}(undef, nh, 1)
+    liq_list = Array{Array{eltype(pf.x_tilde_n)}}(undef, nh, 1)
+    cap_list = Array{Array{eltype(pf.x_tilde_n)}}(undef, nh, 1)
 
     # Index for constrained liquid asset holdings, just temporary
     log_index = Vector{Bool}(undef, n_par.nb)
@@ -582,10 +534,10 @@ function EGM_policyupdate!(
     b_hat_zero = b_hat_a[1, :]
 
     # composite of non-adjustment case that corresponds to k' = 0
-    aux_x = reshape(x_tilde_n[:, 1, :], (nb, nh))
+    aux_x = reshape(pf.x_tilde_n[:, 1, :], (nb, nh))
 
     # Income (from mesh, first and second dimension do not matter)
-    aux_inc = reshape(n_labor_union_inc_GHH[1, 1, :], (1, nh))
+    aux_inc = reshape(net_labor_union_inc[1, 1, :], (1, nh))
 
     # Use composite at k'=0 from constrained problem, when b' is on grid, x_tilde_n is the
     # the policy function on the endogenous grid for the non-adjustment case.
@@ -618,14 +570,14 @@ function EGM_policyupdate!(
             liquid_assets = n_par.grid_b[log_index]
             liq_list[j] = liquid_assets
             res_list[j] = liquid_assets .+ (1.0 .+ (Tc .- 1.0)) .* x_k_cons .- aux_inc[j]
-            cap_list[j] = zeros(eltype(EWbPrime), sum(log_index))
+            cap_list[j] = zeros(eltype(EVfPrime.b), sum(log_index))
         else
             # Case 2: We already covered this as part of the interior solutions in Fastroot
             # Create empty array in order to overwrite undef and prepare next step b) v)
-            cons_list[j] = zeros(eltype(EWbPrime), 0)
-            res_list[j] = zeros(eltype(EWbPrime), 0)
-            liq_list[j] = zeros(eltype(EWbPrime), 0)
-            cap_list[j] = zeros(eltype(EWbPrime), 0)
+            cons_list[j] = zeros(eltype(EVfPrime.b), 0)
+            res_list[j] = zeros(eltype(EVfPrime.b), 0)
+            liq_list[j] = zeros(eltype(EVfPrime.b), 0)
+            cap_list[j] = zeros(eltype(EVfPrime.b), 0)
         end
     end
 
@@ -702,7 +654,7 @@ function EGM_policyupdate!(
 
     =#
 
-    labor_inc_grid = n_labor_union_inc_GHH[1, 1, :][:]
+    labor_inc_grid = net_labor_union_inc[1, 1, :][:]
     log_index2 = zeros(Bool, nb .* nk)
 
     @views @inbounds begin
@@ -724,9 +676,9 @@ function EGM_policyupdate!(
             # Step i): Fill policy functions with interpolates of lists (from Part b, Step
             # v) with endogenous grid values) over the exogenous resource grid
             mylinearinterpolate_mult3!(
-                x_a_star[:, :, j][:],
-                b_a_star[:, :, j][:],
-                k_a_star[:, :, j][:],
+                pf.x_a_star[:, :, j][:],
+                pf.b_a_star[:, :, j][:],
+                pf.k_a_star[:, :, j][:],
                 res_list[j],
                 cons_list[j],
                 liq_list[j],
@@ -739,11 +691,170 @@ function EGM_policyupdate!(
             # according composite) Any resources on grid smaller than res_list[1] imply that
             # HHs consume all resources plus income and both constraints are binding:
             log_index2[:] .= reshape(R_exo_a[:, j], nb * nk) .< res_list[j][1]
-            x_a_star[:, :, j][log_index2] .=
+            pf.x_a_star[:, :, j][log_index2] .=
                 (R_exo_a[log_index2, j] .+ labor_inc_grid[j] .- n_par.grid_b[1]) ./
                 (1.0 .+ (Tc .- 1.0))
-            b_a_star[:, :, j][log_index2] .= n_par.grid_b[1]
-            k_a_star[:, :, j][log_index2] .= 0.0
+            pf.b_a_star[:, :, j][log_index2] .= n_par.grid_b[1]
+            pf.k_a_star[:, :, j][log_index2] .= 0.0
+        end
+    end
+end
+
+"""
+    interpolate_policies_to_fixed!(pf, net_labor_union_inc, n_rental_inc, liquid_asset_inc, Tc, grid_b, nb, nh, transition_type, extrapolate)
+
+Interpolates the policies to a fixed grid using linear interpolation or monotonic PCHIP
+interpolation.
+
+# Arguments
+
+  - `pf`: Policy functions struct to update in-place
+  - `net_labor_union_inc`: Pre-computed net labor income (already extracted from
+    net_income[1])
+  - `n_rental_inc`: Pre-computed rental income (already extracted from net_income[2])
+  - `liquid_asset_inc`: Pre-computed liquid asset income (already extracted from
+    net_income[3])
+  - `Tc`: Pre-computed consumption tax factor (from @read_args_hh_prob)
+  - `grid_b`: Liquid asset grid (n_par.grid_b)
+  - `nb`: Number of liquid asset grid points (pre-computed)
+  - `nh`: Number of income states (pre-computed)
+  - `transition_type`: Type of interpolation transition (LinearTransition or
+    NonLinearTransition)
+  - `extrapolate`: Whether to allow extrapolation beyond grid bounds
+
+# Returns
+
+Nothing (modifies `pf` in-place)
+"""
+function interpolate_policies_to_fixed!(
+    pf::PolicyFunctionsOneAsset,
+    net_labor_union_inc::AbstractArray,
+    n_rental_inc::AbstractArray,
+    liquid_asset_inc::AbstractArray,
+    Tc::Number,
+    grid_b::AbstractVector,
+    nb::Int,
+    nh::Int,
+    transition_type::LinearTransition;
+    extrapolate::Bool = true,
+)
+    @inbounds @views begin
+        for jj = 1:nh
+            # Generate composite and liquid asset policies on fixed grid
+            mylinearinterpolate_mult2!(
+                pf.x_n_star[:, jj],
+                pf.b_n_star[:, jj],
+                pf.b_tilde_n[:, jj],
+                pf.x_tilde_n[:, jj],
+                grid_b,
+                grid_b,
+            )
+
+            # Check for binding borrowing constraints
+            bcpol = pf.b_tilde_n[1, jj]
+            for bb = 1:nb
+                if grid_b[bb] < bcpol
+                    pf.x_n_star[bb, jj] =
+                        (
+                            net_labor_union_inc[bb, jj] +
+                            n_rental_inc[bb, jj] +
+                            liquid_asset_inc[bb, jj] - grid_b[1]
+                        ) / (1 + (Tc - 1))
+                    pf.b_n_star[bb, jj] = grid_b[1]
+                end
+                if !extrapolate
+                    if grid_b[end] < pf.b_n_star[bb, jj]
+                        pf.b_n_star[bb, jj] = grid_b[end]
+                    end
+                end
+            end
+        end
+    end
+end
+
+function interpolate_policies_to_fixed!(
+    pf::PolicyFunctionsOneAsset,
+    net_labor_union_inc::AbstractArray,
+    n_rental_inc::AbstractArray,
+    liquid_asset_inc::AbstractArray,
+    Tc::Number,
+    grid_b::AbstractVector,
+    nb::Int,
+    nh::Int,
+    transition_type::NonLinearTransition;
+    extrapolate::Bool = true,
+)
+    @inbounds @views begin
+        for jj = 1:nh # Loop over income states
+            bcpol = pf.b_tilde_n[1, jj]
+            max_b = pf.b_tilde_n[end, jj]
+
+            # If extrapolate = true, use cubic polynomial at the last interval to extrapolate values outside the domain.
+            # Can lead to problems, when consumption is backed out from budget constraint.
+            b_to_bprime_spline =
+                Interpolator(pf.b_tilde_n[:, jj], grid_b; extrapolate = true)
+            # Linear extrapolation options:
+            # - Linear extrapolation of endogeneous policy and then spline interpolation to grid.
+            # - Linear extrapolation of spline interpolated on-grid policies seems to be the most robust.
+            b_to_bprime_spline =
+                Interpolator(pf.b_tilde_n[:, jj], grid_b; extrapolate = false)
+
+            # Account for extrapolation rules:
+            # - cut of below constraint
+            # - linear extrapolation above maximum endogenous gridpoint
+            # - cut off at maximum gridpoint if extrapolate=false
+            function b_to_bprime_spline_extr!(bprime::AbstractArray, b::Vector{Float64})
+                # Cut off at borrowing constraint if policy is below
+                idx_below_bc = findlast(b .< bcpol)
+                if idx_below_bc !== nothing
+                    bprime[1:idx_below_bc] .= grid_b[1]
+                else
+                    idx_below_bc = 0
+                end
+
+                bprime[(idx_below_bc + 1):end] .=
+                    b_to_bprime_spline.(b[(idx_below_bc + 1):end])
+
+                # In case of linear extrapolation above maximum endogenous gridpoint
+                # Extrapolate linearly if maximum endogenous gridpoint is below points of evaluation
+                idx_after_max = if b[end] > max_b
+                    findfirst(b .> max_b)
+                else
+                    nb + 1
+                end
+
+                # Spline interpolation where no extrapolation required
+                bprime[(idx_below_bc + 1):(idx_after_max - 1)] .=
+                    b_to_bprime_spline.(b[(idx_below_bc + 1):(idx_after_max - 1)])
+
+                # Linear extrapolation above maximum endogenous gridpoint
+                if idx_after_max <= nb
+                    # Use slope at last gridpoint past interpolation
+                    slope =
+                        (bprime[idx_after_max - 1] - bprime[idx_after_max - 2]) /
+                        (b[idx_after_max - 1] - b[idx_after_max - 2])
+                    bprime[idx_after_max:end] .=
+                        bprime[idx_after_max - 1] .+
+                        slope .* (b[idx_after_max:end] .- b[idx_after_max - 1])
+                end
+
+                if !extrapolate
+                    idx_above_grid = findfirst(b .> grid_b[end])
+                    if idx_above_grid !== nothing
+                        bprime[idx_above_grid:end] .= grid_b[end]
+                    end
+                end
+            end
+
+            # Evaluate cdf at fixed grid
+            b_to_bprime_spline_extr!(pf.b_n_star[:, jj], grid_b)
+
+            # Calculate consumption from budget constraint
+            pf.x_n_star[:, jj] =
+                (
+                    net_labor_union_inc[:, jj] .+ n_rental_inc[:, jj] .+
+                    liquid_asset_inc[:, jj] .- pf.b_n_star[:, jj]
+                ) ./ (1.0 + (Tc - 1.0))
         end
     end
 end

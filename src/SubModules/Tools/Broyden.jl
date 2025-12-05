@@ -1,28 +1,30 @@
-@doc raw"""
+"""
     broyden(f, x0, critF, critX, maxiter, tau, tauS)
 
 Solve for the root of a function `f` using the "good" Broyden algorithm, an iterative method
-    to approximate the root of a nonlinear system of equations. This method is an
-    approximation to Newton's method that uses updates to the Jacobian, improving efficiency
-    in solving for the root.
+to approximate the root of a nonlinear system of equations. This method is an
+approximation to Newton's method that uses updates to the Jacobian, improving efficiency
+in solving for the root.
 
 # Arguments
-- `f::Function`: The function for which the root is being found. It should return a vector
-  of values.
-- `x0::AbstractVector`: The starting guess for the root, provided as a column vector.
-- `critF::Real`: The precision required for the function values to converge.
-- `critX::Real`: The precision required for the change in `x` to converge.
-- `maxiter::Int`: The maximum number of iterations allowed for the algorithm.
-- `tau::Real`: A scaling factor used to adjust the update step.
-- `tauS::Real`: A scaling factor for adjusting the step size dynamically with each
-  iteration.
+
+  - `f::Function`: The function for which the root is being found. It should return a vector
+    of values.
+  - `x0::AbstractVector`: The starting guess for the root, provided as a column vector.
+  - `critF::Real`: The precision required for the function values to converge.
+  - `critX::Real`: The precision required for the change in `x` to converge.
+  - `maxiter::Int`: The maximum number of iterations allowed for the algorithm.
+  - `tau::Real`: A scaling factor used to adjust the update step.
+  - `tauS::Real`: A scaling factor for adjusting the step size dynamically with each
+    iteration.
 
 # Returns
-- `xstar::AbstractVector`: The estimated root of the function.
-- `fval::AbstractVector`: The value of the function at the root.
-- `iter::Int`: The number of iterations performed.
-- `distF::AbstractVector`: The distance from zero at each iteration, representing the
-  convergence of the function.
+
+  - `xstar::AbstractVector`: The estimated root of the function.
+  - `fval::AbstractVector`: The value of the function at the root.
+  - `iter::Int`: The number of iterations performed.
+  - `distF::AbstractVector`: The distance from zero at each iteration, representing the
+    convergence of the function.
 """
 function broyden(f, x0, critF, critX, maxiter, tau, tauS)
     distF = zeros(maxiter)

@@ -1,24 +1,32 @@
-@doc raw"""
-    LinearSolution_reduced_system(sr, m_par, A, B,;allow_approx_sol)
+"""
+    LinearSolution_reduced_system(sr, m_par, A, B; allow_approx_sol=false)
 
-Calculate the linearized solution to the non-linear difference equations defined
-by function [`Fsys`](@ref), while only differentiating with respect to the
-aggregate part of the model, [`Fsys_agg()`](@ref).
+Calculate the linearized solution to the non-linear difference equations, but only
+differentiating with respect to the aggregate part of the model [`Fsys_agg()`](@ref).
 
-The partials of the Jacobian belonging to the heterogeneous agent part of the model
-are taken from the full-model derivatives provided as arguments, `A` and `B` (computed
-by [`LinearSolution()`](@ref)).
+The partial derivatives of the Jacobian belonging to the heterogeneous agent part of the
+model are taken from the full-model derivatives provided as arguments, `A` and `B` (computed
+by [`LinearSolution()`](@ref)). This allows for faster updates during estimation when only
+aggregate parameters change.
 
 # Arguments
-- `sr`: steady-state structure (variable values, indexes, numerical parameters, ...)
-- `A`,`B`: derivative of [`Fsys()`](@ref) with respect to arguments `X` [`B`] and
-    `XPrime` [`A`]
-- `m_par`: model parameters
-- `allow_approx_sol`: if `true`, the function will attempt to solve the linearized model
-    even if the system is indeterminate (shifting the critical eigenvalues)
+
+  - `sr`: Steady-state structure (`SteadyResults`) containing variable values, indexes,
+    numerical parameters, etc.
+  - `m_par`: Model parameters (`ModelParameters`).
+  - `A`,`B`: Derivative matrices of the full [`Fsys()`](@ref) with respect to `XPrime` (`A`)
+    and `X` (`B`). These are used as the base, and only the aggregate parts are updated.
+  - `allow_approx_sol`: Keyword, `Bool` (default `false`). If `true`, the function will
+    attempt to solve the linearized model even if the system is indeterminate.
 
 # Returns
-as in [`LinearSolution()`](@ref)
+
+  - `gx`: Observation equations matrix (mapping states to controls).
+  - `hx`: State transition equations matrix (mapping states to future states).
+  - `alarm_LinearSolution`: `Bool`. `true` if the solution algorithm fails.
+  - `nk`: Number of predetermined variables (states).
+  - `A`,`B`: The updated first derivatives of the system (aggregate parts re-computed,
+    heterogeneous parts preserved).
 """
 function LinearSolution_reduced_system(
     sr,
@@ -28,9 +36,9 @@ function LinearSolution_reduced_system(
     allow_approx_sol = false,
 )
 
-    ############################################################################
-    # Calculate dericatives of non-lineear difference equation
-    ############################################################################
+    ## --------------------------------------------------------------------------
+    ## Calculate dericatives of non-lineear difference equation
+    ## --------------------------------------------------------------------------
     length_X0 = length(sr.XSSaggr)
     BA = ForwardDiff.jacobian(
         x -> Fsys_agg(
@@ -68,9 +76,9 @@ function LinearSolution_reduced_system(
     #     end
     # end
 
-    ############################################################################
-    # Solve the linearized model: Policy Functions and LOMs
-    ############################################################################
+    ## --------------------------------------------------------------------------
+    ## Solve the linearized model: Policy Functions and LOMs
+
     gx, hx, alarm_LinearSolution, nk = SolveDiffEq(A, B, sr.n_par, allow_approx_sol)
 
     return gx, hx, alarm_LinearSolution, nk, A, B

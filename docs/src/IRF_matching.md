@@ -1,4 +1,6 @@
 # Impulse Response (IRF) Matching
+!!! note
+    The IRF matching logic lives in `src/SubModules/Estimation/irf_matching.jl`.
 
 This page describes the impulse response matching workflow and the elements the user needs to adjust for a successful run. For a more technical description of the procedure, see Christiano et al. (2010). An application of the procedure can be found in Bayer, C., Born, B., & Luetticke, R. (2023).
 
@@ -44,7 +46,19 @@ However, when we plot your provided estimates and standard errors, we will take 
 
 Two files are important for the estimation: `input_parameters.jl` (where `EstimationSettings` and `ModelParameters` are defined) and the mainboard `main_irfmatching.jl` (provided as an example for IRF matching runs).
 
-### 2a) Update Estimation Settings in `input_parameters.jl`
+### API: IRF Matching Functions
+
+The IRF matching workflow is implemented in the `Estimation` submodule. These are the primary user-facing and helper functions:
+
+```@docs
+BASEforHANK.Estimation.irfmatch
+BASEforHANK.Estimation.irfmatch_backend
+BASEforHANK.Estimation.compute_irfs_for_matching
+BASEforHANK.Estimation.remap_params!
+BASEforHANK.Estimation.softplus
+```
+
+### 2a) Update [EstimationSettings](@ref) in `input_parameters.jl`
 
 Create or modify an instance of `EstimationSettings` inside `main_irfmatching.jl`. Example:
 
@@ -59,7 +73,7 @@ e_set = EstimationSettings(;
         :LPXA, # Ex-ante liquidity premium
     ],
     max_iter_mode = 2000,
-    f_tol = 1.0e-6,
+    f_reltol = 1.0e-6,
     x_tol = 1.0e-8,
     ndraws = 500,
     burnin = 7000,
@@ -111,12 +125,16 @@ For the user, this step is the same with or without IRF matching. No coding adju
 
 With these adjustments, you can execute the estimation procedure, and the optimizer will find parameter values that minimize the distance between model estimates and data estimates, for your chosen variables and shocks. An MCMC step is then conducted to generate the posterior, from which we can sample from.
 
+For convenience, you can also use the same mode finding and MCMC wrappers documented under Estimation to run IRF matching. While the objective differs (IRF distance vs. likelihood), the wrappers handle common tasks like prior evaluation, diagnostics, and smoother outputs when applicable.
+
 It is important to keep track of the optimization trace. This informs you about the acceptance rate and the current posterior likelihood. If things look strange, some suggestions: (1) have a look at the `mhscale`, which scales the perturbations in the MCMC sampler, (2) compute the hessian by setting `compute_hessian = true` in `EstimationSettings`, (3) look at the standard errors of your estimator (precise estimates are given priority), or (4) change the number of runs in the optimization or number of draws in the MCMC sampler.
 
 
 ## Step 4 — Computation of IRFs and Confidence Intervals
 
 For the computation of IRFs, there is no special function. One can simply use `compute_irfs` to generate them.
+
+Note: The example below uses the public `compute_irfs` from the `PostEstimation` module, which supports confidence intervals and plotting workflows. During IRF matching optimization, an internal fast version is used to evaluate model IRFs without interval estimation.
 
 If you wish to estimate confidence intervals, then please read the text below. Otherwise, you can skip.
 
@@ -196,8 +214,8 @@ If one wishes to have intervals around point estimates, `intervals` needs to be 
 # Description of the CSV file containing the external estimates
 To generate your own file of external estimates, follow the file structure of the data file provided. Here is a small example:
 
-| time | pointdum | shock  |   Y  |   C  |  π   |
-|------|----------|--------|------|------|------|
+| time | pointdum | shock  | Y    | C    | π    |
+| ---- | -------- | ------ | ---- | ---- | ---- |
 | 1    | 1        | Gshock | 0.20 | 0.10 | 0.05 |
 | 1    | 0        | Gshock | 0.05 | 0.04 | 0.02 |
 | 2    | 1        | Gshock | 0.15 | 0.08 | 0.04 |

@@ -1,4 +1,4 @@
-@doc raw"""
+"""
     Fastroot(xgrid::Vector, fx::AbstractArray)
 
 Used for fast root finding using linear interpolation and a simplified Newton step.
@@ -7,13 +7,15 @@ This function performs a fast root-finding algorithm on a given grid (`xgrid`) a
 values (`fx`). It applies a single Newton step at the largest negative function value.
 
 # Arguments
-- `xgrid::Vector`: The grid of x values.
-- `fx::AbstractArray`: Function values evaluated at the points in `xgrid`. The array should
-  be reshaped to match the dimensions of `xgrid`.
+
+  - `xgrid::Vector`: The grid of x values.
+  - `fx::AbstractArray`: Function values evaluated at the points in `xgrid`. The array should
+    be reshaped to match the dimensions of `xgrid`.
 
 # Returns
-- `roots::Vector`: A vector of roots found through interpolation for each column of `fx`.
-  The length of the vector corresponds to the number of columns in `fx`.
+
+  - `roots::Vector`: A vector of roots found through interpolation for each column of `fx`.
+    The length of the vector corresponds to the number of columns in `fx`.
 """
 function Fastroot(xgrid::Vector, fx::AbstractArray)
     #fast linear interpolation root finding (=one Newton step at largest negative function

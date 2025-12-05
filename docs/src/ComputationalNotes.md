@@ -700,6 +700,10 @@ while dist > n_par.ϵ && count < 10000
 ```
 
 ## Aggregation via non-stochastic simulations
+
+!!! warning
+    This section describes the Young-method that is standard in the literature for linearized heterogeneous agent-models. For models with one asset, we recommend using the novel DEGM-algorithm instead, described in [Bayer, Luetticke, Weiss, and Winkelmann (2025)](https://cepr.org/publications/dp19067). This can be done within our toolbox by setting `NonLinearTransition()` in the Parameter-file. For the second-order solution, only the DEGM-method will yield correct results, but already when solving for the non-stochastic steady state, the DEGM-method's convergence in grid points is much faster.
+
 This section illustrates aggregation via non-stochastic simulations based on the method of [Young (2010)](https://www.sciencedirect.com/science/article/pii/S0165188909001316). Young introduces a method that replaces traditional stochastic simulations with a non-stochastic counterpart. Instead of approximating the distributions of households by simulating a large cross-section of households stochastically, Young's method directly simulates the distribution of households. This approach involves iterating on a fixed grid of points to approximate the distribution of individual states, thereby eliminating the sampling variability inherent in stochastic simulations. The non-stochastic simulation aims to improve computational efficiency and accuracy in solving models with heterogeneous agents.
 
 Below, we will illustrate the idea of Young's method based on the household problem of a Krusell and Smith economy as in the original paper. We will demonstrate how Young's method allows us to find the transition matrix $\Gamma_t$, before illustrating the application of the method to the calculation of the steady state, as well as the movement of the distribution over time. In line with the former section, we use the expressions $\vec b$, $\vec k$, and $\vec h$ for the exogenously given vectors over which we discretize the continuous state space, and $n_b$, $n_k$, and $n_h$ denote their respective sizes.

@@ -4,7 +4,6 @@ module PostEstimation
 using ..PerturbationSolution
 using ..Tools
 using ..Parsing
-using ..LoggingTools
 
 # 3rd Party modules
 using Plots,
@@ -16,7 +15,17 @@ using Plots,
     AlgebraOfGraphics,
     Printf,
     CSV,
-    Flatten
+    Flatten,
+    Setfield,
+    Parameters,
+    SparseArrays,
+    BlockDiagonals,
+    Roots,
+    ForwardDiff,
+    PrettyTables,
+    PCHIPInterpolation,
+    Kronecker
+using MatrixEquations: lyapd
 
 using LaTeXStrings
 using CairoMakie: BarPlot, Label
@@ -34,6 +43,9 @@ include("PostEstimation/plot_distributional_irfs.jl")
 include("PostEstimation/plot_vardecomp.jl")
 include("PostEstimation/plot_hist_decomp.jl")
 
+include("PostEstimation/uncondMoments.jl")
+include("PostEstimation/GIRF.jl")
+
 export compute_irfs,
     compute_vardecomp,
     compute_vardecomp_bcfreq,
@@ -43,6 +55,9 @@ export compute_irfs,
     plot_vardecomp,
     plot_vardecomp_bcfreq,
     plot_distributional_irfs,
-    plot_hist_decomp
+    plot_hist_decomp,
+    uncondFirstMoment_SO_analytical,
+    GIRF_FO,
+    GIRF_SO
 
 end

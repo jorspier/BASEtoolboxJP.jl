@@ -10,8 +10,10 @@
       verbose = true,
       irf_interval_options = nothing,
       distribution = false,
+      transform_elements = nothing,
       comp_ids = nothing,
       n_par = nothing,
+      m_par = nothing,
     )
 
 Computes impulse response functions (IRFs) for a given set of shocks to exogenous variables.
@@ -38,6 +40,8 @@ Computes impulse response functions (IRFs) for a given set of shocks to exogenou
   - `comp_ids`: Compression indices for the distribution, as created by
     `prepare_linearization`. Needed if `distribution` is true. Defaults to nothing.
   - `n_par`: Model parameters, needed for distributional IRFs. Defaults to nothing.
+  - `m_par`: Model parameters, needed for distributional IRFs. Defaults to nothing.
+  - `transform_elements`: Transformation elements for the distributional IRFs. Defaults to nothing.
 
 # Returns
 
@@ -62,8 +66,10 @@ function compute_irfs(
     verbose::Bool = true,
     irf_interval_options = nothing,
     distribution::Bool = false,
+    transform_elements = nothing,
     comp_ids = nothing,
     n_par = nothing,
+    m_par = nothing,
 )
 
     # If distributional IRFs are requested, check if all required arguments are provided
@@ -117,8 +123,10 @@ function compute_irfs(
                 ncontrols,
                 init_val[i],
                 distribution,
+                transform_elements,
                 comp_ids,
                 n_par,
+                m_par,
             )
 
             # Fill in here
@@ -139,8 +147,10 @@ function compute_irfs(
                 ncontrols,
                 init_val[i],
                 distribution,
+                transform_elements,
                 comp_ids,
                 n_par,
+                m_par,
             )
 
             # Computing IRFs for all parameter draws (for IRF matching)
@@ -264,8 +274,10 @@ end
         ncontrols::Int64,
         init_val::Float64,
         distribution::Bool,
+        transform_elements,
         comp_ids,
         n_par,
+        m_par,
     )
 
 Simulates impulse response functions (IRFs) for a single shock to a linear state-space
@@ -288,8 +300,11 @@ system and reconstructs the levels for a subset of aggregate variables.
   - `ncontrols::Int64`: Number of control variables.
   - `init_val::Float64`: Initial value of the shock applied to the `exovar` state.
   - `distribution::Bool`: If true, computes additional distributional IRFs.
+  - `transform_elements`: Transformation elements (DCT, IDCT, Γ) needed for distributional
+    IRFs.
   - `comp_ids`: Compression indices passed to the distributional IRF routine.
   - `n_par`: Model parameters (e.g., grid sizes) passed to the distributional IRF routine.
+  - `m_par`: Model parameters struct passed to the distributional IRF routine.
 
 # Returns
 
@@ -324,8 +339,10 @@ function compute_irfs_inner(
     ncontrols::Int64,
     init_val::Float64,
     distribution::Bool,
+    transform_elements,
     comp_ids,
     n_par,
+    m_par,
 )
 
     # Initialize matrices for states and controls
@@ -352,7 +369,15 @@ function compute_irfs_inner(
     level[idx, :] = exp.(XSS[idxSS] .+ original[idx, :])
 
     if distribution
-        dist_results = compute_irfs_inner_distribution(original, ids, XSS, comp_ids, n_par)
+        dist_results = compute_irfs_inner_distribution(
+            original,
+            XSS,
+            ids,
+            comp_ids,
+            transform_elements,
+            n_par,
+            m_par,
+        )
         return original, level, dist_results
     else
         return original, level
@@ -360,7 +385,7 @@ function compute_irfs_inner(
 end
 
 """
-    compute_irfs_inner_distribution(original, ids, XSS, comp_ids, n_par)
+    compute_irfs_inner_distribution(X, XSS, ids, compressionIndexes, transform_elements, n_par, m_par)
 
 Reconstructs the full, uncompressed impulse responses for the marginal value functions (Wb,
 Wk) and the joint probability distribution (PDF) from their compressed representations.
@@ -372,12 +397,15 @@ and Shuffle), and the IRF deviations to compute the dynamics of the entire state
 
 # Arguments
 
-  - `original::Array{Float64,2}`: A matrix `(n_vars x T)` containing the compressed IRFs for
+  - `X::Array{Float64,2}`: A matrix `(n_vars x T)` containing the compressed IRFs for
     all variables.
-  - `ids`: An object mapping variable names to their indices in `original` and `XSS`.
   - `XSS::Vector{Float64}`: The steady-state vector of the model.
-  - `comp_ids`: An object containing the indices for compressed variables.
+  - `ids`: An object mapping variable names to their indices in `X` and `XSS`.
+  - `compressionIndexes`: An object containing the indices for compressed variables.
+  - `transform_elements`: An object containing the transformation matrices (DCT, IDCT,
+    Γ) needed for unpacking.
   - `n_par`: A struct with numerical parameters (e.g., grid sizes).
+  - `m_par`: A struct with model parameters.
 
 # Returns
 
@@ -401,131 +429,87 @@ and Shuffle), and the IRF deviations to compute the dynamics of the entire state
     assets, aggregated over one dimension.
 """
 function compute_irfs_inner_distribution(
-    original::Array{Float64,2},
+    X::AbstractMatrix,
+    XSS::AbstractVector,
     ids,
-    XSS::Vector{Float64},
-    comp_ids,
-    n_par,
+    compressionIndexes::Vector,
+    transform_elements::TransformationElements,
+    n_par::NumericalParameters,
+    m_par::ModelParameters,
 )
 
-    ## 1. Preamble & Setup
-
-    # Unpack grid sizes and number of periods from parameters
+    ## 1. Preamble & Setup ---------------------------------------------------------------
     nb, nk, nh = n_par.nb, n_par.nk, n_par.nh
-    nb_c, nk_c, nh_c = n_par.nb_copula, n_par.nk_copula, n_par.nh_copula
-    T = size(original, 2)
+    T = size(X, 2)
 
-    ## 2. Unpack Steady-State Values
+    ## 2. Getting IDs and unpacking Steady State Objects ---------------------------------
+    vf_indexes_ss = ids.valueFunctionSS
+    distr_indexes_ss = ids.distrSS
 
-    # Steady-state marginal value functions
-    WbSS = XSS[ids.WbSS]
-    WkSS = XSS[ids.WkSS]
+    vf_indexes = ids.valueFunction
+    distr_indexes = ids.distr
 
-    # Steady-state marginal probability density functions (PDFs)
-    PDF_bSS = XSS[ids.distr_bSS]
-    PDF_kSS = XSS[ids.distr_kSS]
-    PDF_hSS = XSS[ids.distr_hSS]
+    # Steady-state value functions (in log-inverse-marginal-utility space)
+    vfSS = unpack_ss_valuefunctions(XSS, vf_indexes_ss, m_par, n_par)
 
-    # Steady-state joint PDF
-    PDFSS = reshape(XSS[ids.COPSS], (nb, nk, nh))
+    # Steady-state joint distribution object
+    distrSS = unpack_ss_distributions(XSS, distr_indexes_ss, n_par)
 
-    # Steady-state marginal cumulative distribution functions (CDFs)
-    CDF_bSS = cumsum(PDF_bSS[:])
-    CDF_kSS = cumsum(PDF_kSS[:])
-    CDF_hSS = cumsum(PDF_hSS[:])
+    ## 3. Initialize Output Containers ---------------------------------------------------
+    Wb = zeros(nb, nk, nh, T)   # marginal value of b (or m.u. of c wrt b)
+    Wk = zeros(nb, nk, nh, T)   # marginal value of k
+    PDF = zeros(nb, nk, nh, T)   # joint PDF(b,k,h)
 
-    # Steady-state joint CDF
-    CDFSS = pdf_to_cdf(PDFSS)
-
-    # This is the uniform coordinate grid [0,1] for each dimension of the copula. The copula
-    # deviation (COP_Dev) is defined on this grid.
-    s_m_b = n_par.copula_marginal_b
-    s_m_k = n_par.copula_marginal_k
-    s_m_h = n_par.copula_marginal_h
-
-    ## 3. Compute Transformation Matrices
-
-    # DCT matrices for compressing/uncompressing the value functions
-    DC = Array{Array{Float64,2},1}(undef, 3)
-    DC[1] = mydctmx(nb)
-    DC[2] = mydctmx(nk)
-    DC[3] = mydctmx(nh)
-    IDC = [DC[1]', DC[2]', DC[3]']
-
-    # DCT matrices for compressing/uncompressing the copula
-    DCD = Array{Array{Float64,2},1}(undef, 3)
-    DCD[1] = mydctmx(nb_c)
-    DCD[2] = mydctmx(nk_c)
-    DCD[3] = mydctmx(nh_c)
-    IDCD = [DCD[1]', DCD[2]', DCD[3]']
-
-    # Shuffle matrix
-    Γ = shuffleMatrix(PDFSS, nb, nk, nh)
-
-    ## 4. Initialize Output Containers
-
-    # Containers to store the full, uncompressed 4D IRF objects (state x state x state x
-    # time)
-    Wb = zeros(nb, nk, nh, T)
-    Wk = zeros(nb, nk, nh, T)
-    PDF = zeros(nb, nk, nh, T)
-
-    ## 5. Main Loop: Reconstruct Full Dynamics for Each Period
+    ## 4. Main Loop: Reconstruct Full Dynamics for Each Period --------------------------
     for t = 1:T
+        X_t = view(X, :, t)
 
-        ## a) Reconstruct Marginal Value Functions
-        Wb[:, :, :, t] .= reshape(
-            exp.(WbSS .+ uncompress(comp_ids[1], original[ids.Wb, t], DC, IDC)),
-            (nb, nk, nh),
+        # 4a) Value functions -----------------------------------------------------------
+        vf_t = unpack_perturbed_valuefunctions(
+            X_t,
+            vf_indexes,
+            vfSS,
+            transform_elements,
+            compressionIndexes,
+            n_par,
         )
-        Wk[:, :, :, t] .= reshape(
-            exp.(WkSS .+ uncompress(comp_ids[2], original[ids.Wk, t], DC, IDC)),
-            (nb, nk, nh),
+
+        Wb[:, :, :, t] = vf_t.b
+        if n_par.model isa TwoAsset
+            Wk[:, :, :, t] = vf_t.k
+        end
+
+        # 4b) Joint distribution via copula --------------------------------------------
+        distr_t, _ = unpack_perturbed_distributions(
+            X_t,
+            X_t,                  # we don't care about the "prime" distribution here
+            distrSS,
+            distr_indexes,
+            compressionIndexes,
+            transform_elements,
+            n_par,
         )
-
-        ## b) Reconstruct the Joint PDF
-
-        # Step i: Uncompress the deviation of the copula from its steady state. This gives
-        # the PDF of the deviation, defined on the coarse copula grid.
-        θD = uncompress(comp_ids[3], original[ids.COP, t], DCD, IDCD)[:]
-        COP_Dev_pdf = reshape(θD, (nb_c, nk_c, nh_c))
-
-        # Step ii: Convert the deviation's PDF to a CDF for interpolation.
-        COP_Dev_cdf = pdf_to_cdf(COP_Dev_pdf)
-
-        # Step iii: Reconstruct the perturbed marginal PDFs and their corresponding CDFs for
-        # period t.
-        PDF_b = PDF_bSS .+ Γ[1] * original[ids.distr_b, t]
-        CDF_b = cumsum(PDF_b)
-        PDF_k = PDF_kSS .+ Γ[2] * original[ids.distr_k, t]
-        CDF_k = cumsum(PDF_k)
-        PDF_h = PDF_hSS .+ Γ[3] * original[ids.distr_h, t]
-        CDF_h = cumsum(PDF_h)
-
-        # Step iv: Construct the full joint CDF. This is done by taking the steady-state
-        # joint CDF and adding the interpolated deviation. The result is evaluated at the
-        # points defined by the perturbed marginal CDFs.
-        Copula(x, y, z) =
-            myinterpolate3(CDF_bSS, CDF_kSS, CDF_hSS, CDFSS, n_par.model, x, y, z) .+
-            myinterpolate3(s_m_b, s_m_k, s_m_h, COP_Dev_cdf, n_par.model, x, y, z)
-        CDF = Copula(CDF_b, CDF_k, CDF_h)
-
-        # Step v: Convert the reconstructed joint CDF back to a PDF.
-        PDF[:, :, :, t] .= cdf_to_pdf(CDF)
+        CDF_joint = distr_t.COP
+        PDF[:, :, :, t] = cdf_to_pdf(CDF_joint)
     end
 
-    # Compute all marginals for Wb, Wk, and PDF
-    all_marginals = Dict()
+    ## 5. Marginals and Output Dict -----------------------------------------------------
 
-    # Function compute_all_marginals returns a Dict, which we merge with original dict
+    all_marginals = Dict{String,Any}()
     merge!(all_marginals, compute_all_marginals(PDF, "PDF"))
     merge!(all_marginals, compute_all_marginals(Wb, "Wb"))
-    merge!(all_marginals, compute_all_marginals(Wk, "Wk"))
 
-    # Add the full 3D objects back in
+    if n_par.model isa TwoAsset
+        # Only meaningful in the two-asset case
+        merge!(all_marginals, compute_all_marginals(Wk, "Wk"))
+    end
+
+    # Also store full 3D×time objects
     all_marginals["PDF"] = PDF
     all_marginals["Wb"] = Wb
-    all_marginals["Wk"] = Wk
+    if n_par.model isa TwoAsset
+        all_marginals["Wk"] = Wk
+    end
 
     return all_marginals
 end
@@ -805,6 +789,8 @@ function compute_irf_given_param_draw(exovar, init_val, param_draw, T, irf_inter
     distribution = false
     comp_ids = nothing
     n_par = nothing
+    m_par = nothing
+    transform_elements = nothing
 
     IRFs, IRFs_lvl = compute_irfs_inner(
         exovar,
@@ -817,8 +803,10 @@ function compute_irf_given_param_draw(exovar, init_val, param_draw, T, irf_inter
         ncontrols,
         init_val,
         distribution,
+        transform_elements,
         comp_ids,
         n_par,
+        m_par,
     )
     return IRFs, IRFs_lvl
 end

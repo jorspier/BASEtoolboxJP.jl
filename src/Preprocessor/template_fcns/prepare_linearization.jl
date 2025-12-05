@@ -45,17 +45,15 @@ Given the stationary equilibrium of the household side, computed in
 """
 function prepare_linearization(
     K::Float64,
-    Wb::Array{Float64,3},
-    Wk::Array{Float64,3},
-    distr::Array{Float64,3},
+    vf::ValueFunctions,
+    distr::Array{Float64},
     n_par::NumericalParameters,
     m_par::ModelParameters,
 )
 
     # Guarantee stability of the scope of the function
     KSS = copy(K)
-    WbSS = copy(Wb)
-    WkSS = copy(Wk)
+    vfSS = copy(vf)
     distrSS = copy(distr)
 
     ## ------------------------------------------------------------------------------------
@@ -80,125 +78,50 @@ function prepare_linearization(
     ## Idiosyncratic part -----------------------------------------------------------------
 
     # Solution to household problem in the stationary equilibrium, given args_hh_prob
-    KSS,
-    BSS,
-    ΓSS,
-    Γ_aSS,
-    Γ_nSS,
-    x_a_starSS,
-    b_a_starSS,
-    k_a_starSS,
-    x_n_starSS,
-    b_n_starSS,
-    WbSS,
-    WkSS,
-    distrSS = Ksupply(args_hh_prob, n_par, m_par, WbSS, WkSS, distrSS, net_income, eff_int)
+    KSS, BSS, transition_matricesSS, pfSS, vfSS, distrSS =
+        Ksupply(args_hh_prob, n_par, m_par, vfSS, distrSS, net_income, eff_int)
+    vfSS.b .*= eff_int
 
-    WbSS .*= eff_int
+    # Produce distribution structure with CDFSS and potentially marginals
+    distrSS = set_distribution(
+        pdf_to_cdf(distrSS),
+        n_par.model,
+        n_par.distribution_states,
+        n_par.transition_type,
+    )
+    distrXSS_vec = vcat(vec.(struc_to_vec(distrSS))...)
 
     # Distributional summary statistics (for filling in the steady state vector)
-    _, _, _, TOP10WshareSS, TOP10IshareSS, TOP10InetshareSS, GiniWSS, GiniCSS, sdlogySS =
-        distrSummaries(
-            distrSS,
-            qSS,
-            x_a_starSS,
-            x_n_starSS,
-            n_par,
-            net_income,
-            gross_income,
-            m_par,
-        )
+    TOP10WshareSS, TOP10IshareSS, TOP10InetshareSS, GiniWSS, GiniCSS, sdlogySS =
+        distrSummaries(distrSS, qSS, pfSS, n_par, net_income, gross_income, m_par)
 
     ## ------------------------------------------------------------------------------------
     ## Step 2: Dimensionality reduction
     ## ------------------------------------------------------------------------------------
 
-    ## DCT coefficients for marginal value functions --------------------------------------
+    compressionIndexes = dimensionality_reduction(
+        vfSS,
+        transition_matricesSS,
+        pfSS,
+        args_hh_prob,
+        m_par,
+        n_par,
+        n_par.transition_type,
+        n_par.distribution_states,
+    )
 
-    # Identify the co-linear variables in arguments of household problem
-    exclude_list = ["N", "Hprog", "Htilde"]
-    include_list_idx = findall(x -> x ∉ exclude_list, args_hh_prob_names)
-
-    if typeof(n_par.model) == CompleteMarkets
-        indb = [1 2]
-        indk = [1 2]
-    else
-        # Perform first stage reduction
-        indk, indb, _ = first_stage_reduction(
-            WkSS,
-            WbSS,
-            Γ_aSS,
-            Γ_nSS,
-            b_a_starSS,
-            k_a_starSS,
-            b_n_starSS,
-            args_hh_prob,
-            include_list_idx,
-            n_par,
-            m_par,
-        )
+    # Apply log inverse transformation to value Functions
+    for f in fieldnames(typeof(vfSS))
+        setproperty!(vfSS, f, log.(invmutil(getfield(vfSS, f), m_par)))
     end
+    vfSS_vec = vcat(vec.(struc_to_vec(vfSS))...)
+    # Produce marginal distributions
+    copula_marginal_b, copula_marginal_k, copula_marginal_h =
+        produce_marginals(distrSS, n_par)
 
-    WbSS = log.(invmutil(WbSS, m_par))
-    WkSS = log.(invmutil(WkSS, m_par))
-    compressionIndexesWb =
-        typeof(n_par.model) == CompleteMarkets ? [] : sort(unique(vcat(indb...)))
-    compressionIndexesWk =
-        typeof(n_par.model) == TwoAsset ? sort(unique(vcat(indk...))) : []
-
-    ## Polynomials for copula perturbation ------------------------------------------------
-
-    SELECT = [
-        (!((i == 1) & (j == 1)) & !((k == 1) & (j == 1)) & !((k == 1) & (i == 1))) for
-        i = 1:(n_par.nb_copula), j = 1:(n_par.nk_copula), k = 1:(n_par.nh_copula)
-    ]
-
-    # store indices of selected coeffs
-    compressionIndexesCOP = findall(SELECT[:])
-
-    ## Store compression indexes ----------------------------------------------------------
-
-    # Container to store all retained coefficients in one array
-    compressionIndexes = Array{Array{Int,1},1}(undef, 3)
-    compressionIndexes[1] = compressionIndexesWb
-    compressionIndexes[2] = compressionIndexesWk
-    compressionIndexes[3] = compressionIndexesCOP
-
-    ## Produce marginals ------------------------------------------------------------------
-
-    # Calculate CDF from PDF
-    CDFSS = cumsum(cumsum(cumsum(distrSS; dims = 1); dims = 2); dims = 3)
-
-    # Marginal distribution (pdf) of liquid assets
-    distr_bSS = sum(distrSS; dims = (2, 3))[:]
-
-    # Marginal distribution (pdf) of illiquid assets
-    distr_kSS = sum(distrSS; dims = (1, 3))[:]
-
-    # Marginal distribution (pdf) of productivity
-    distr_hSS = sum(distrSS; dims = (1, 2))[:]
-
-    # Marginal distribution (cdf) of liquid assets
-    CDF_bSS = cumsum(distr_bSS[:])
-
-    # Marginal distribution (cdf) of illiquid assets
-    CDF_kSS = cumsum(distr_kSS[:])
-
-    # Marginal distribution (cdf) of productivity
-    CDF_hSS = cumsum(distr_hSS[:])
-
-    # Calculate interpolation nodes for the copula as those elements of the marginal
-    # distribution that yield close to equal aggregate shares in liquid wealth, illiquid
-    # wealth and productivity. Entrepreneur state treated separately.
-    @set! n_par.copula_marginal_b =
-        n_par.nb == 1 ? distr_bSS :
-        copula_marg_equi(distr_bSS, n_par.grid_b, n_par.nb_copula)
-    @set! n_par.copula_marginal_k =
-        n_par.nk == 1 ? distr_kSS :
-        copula_marg_equi(distr_kSS, n_par.grid_k, n_par.nk_copula)
-    @set! n_par.copula_marginal_h =
-        n_par.nh == 2 ? distr_hSS :
-        copula_marg_equi_h(distr_hSS, n_par.grid_h, n_par.nh_copula)
+    @set! n_par.copula_marginal_b = copula_marginal_b
+    @set! n_par.copula_marginal_k = copula_marginal_k
+    @set! n_par.copula_marginal_h = copula_marginal_h
 
     ## ------------------------------------------------------------------------------------
     ## Step 3: Get the aggregate steady state (`input_aggregate_steady_state.mod`)
@@ -216,33 +139,10 @@ function prepare_linearization(
     ## ------------------------------------------------------------------------------------
 
     # produce indexes to access XSS etc.
-    indexes = produce_indexes(
-        n_par,
-        compressionIndexesWb,
-        compressionIndexesWk,
-        compressionIndexesCOP,
-    )
+    indexes = produce_indexes(n_par, compressionIndexes[1], compressionIndexes[2])
     indexes_aggr = produce_indexes_aggr(n_par)
 
-    @set! n_par.ntotal =
-        length(vcat(compressionIndexes...)) +
-        (n_par.nh + n_par.nb + n_par.nk - 3 + n_par.naggr)
-    @set! n_par.nstates =
-        n_par.nh + n_par.nk + n_par.nb - 3 +
-        n_par.naggrstates +
-        length(compressionIndexes[3])
-    @set! n_par.ncontrols = length(vcat(compressionIndexes[1:2]...)) + n_par.naggrcontrols
-    @set! n_par.LOMstate_save = zeros(n_par.nstates, n_par.nstates)
-    @set! n_par.State2Control_save = zeros(n_par.ncontrols, n_par.nstates)
-    @set! n_par.nstates_r = copy(n_par.nstates)
-    @set! n_par.ncontrols_r = copy(n_par.ncontrols)
-    @set! n_par.ntotal_r = copy(n_par.ntotal)
-    @set! n_par.PRightStates = Diagonal(ones(n_par.nstates))
-    @set! n_par.PRightAll = Diagonal(ones(n_par.ntotal))
-
-    if n_par.n_agg_eqn != n_par.naggr - length(n_par.distr_names)
-        @warn "Inconsistency in number of aggregate variables and equations!"
-    end
+    n_par = set_npar_sizes(n_par, compressionIndexes)
 
     ## ------------------------------------------------------------------------------------
     ## Step 5: Check consistency
@@ -259,18 +159,7 @@ function prepare_linearization(
     ## Step 6: Return results
     ## ------------------------------------------------------------------------------------
 
-    return XSS,
-    XSSaggr,
-    indexes,
-    indexes_aggr,
-    compressionIndexes,
-    n_par,
-    m_par,
-    CDFSS,
-    CDF_bSS,
-    CDF_kSS,
-    CDF_hSS,
-    distrSS
+    return XSS, XSSaggr, indexes, indexes_aggr, compressionIndexes, n_par, m_par, distrSS
 end
 
 ## ----------------------------------------------------------------------------------------
@@ -278,10 +167,10 @@ end
 ## ----------------------------------------------------------------------------------------
 
 """
-    copula_marg_equi_h(distr_i, grid_i, nx)
+    copula_marg_equi_h(CDF_i, grid_i, nx)
 """
-function copula_marg_equi_h(distr_i, grid_i, nx)
-    CDF_i = cumsum(distr_i[:])
+function copula_marg_equi_h(CDF_i, grid_i, nx)
+    distr_i = [0.0; diff(CDF_i)]
     aux_marginal = collect(range(CDF_i[1]; stop = CDF_i[end], length = nx))
 
     x2 = 1.0
@@ -308,10 +197,10 @@ function copula_marg_equi_h(distr_i, grid_i, nx)
 end
 
 """
-    copula_marg_equi(distr_i, grid_i, nx)
+    copula_marg_equi(CDF_i, grid_i, nx)
 """
-function copula_marg_equi(distr_i, grid_i, nx)
-    CDF_i = cumsum(distr_i[:])
+function copula_marg_equi(CDF_i, grid_i, nx)
+    distr_i = [0.0; diff(CDF_i)]
     aux_marginal = collect(range(CDF_i[1]; stop = CDF_i[end], length = nx))
 
     x2 = 1.0
@@ -337,6 +226,94 @@ function copula_marg_equi(distr_i, grid_i, nx)
 end
 
 """
+    copula_marg_equi(CDF_i::AbstractVector, grid_i::AbstractVector, nx::Int; enforce_first_x::Int=1)
+
+Sample from the distribution `distr_i` using equishared weights.
+
+# Arguments
+
+  - `distr_i::AbstractVector`: The input PDF representing the marginal distribution.
+  - `grid_i::AbstractVector`: The grid corresponding to the PDF.
+  - `nx::Int`: The number of grid points for the output marginal distribution.
+  - `enforce_first_x::Int=1`: The number of grid points to enforce at the beginning of the
+    marginal distribution.
+
+# Returns
+
+  - `copula_marginal::AbstractVector`: A strictly increasing marginal distribution for the
+    copula.
+
+# Notes
+
+  - The function ensures that the resulting marginal distribution is strictly increasing.
+  - The first `enforce_first_x` grid points are fixed to the corresponding values in the
+    input grid.
+  - The function uses a combination of equidistant and convex weighting methods to generate
+    the marginal distribution.
+"""
+function copula_marg_equi_convex(CDF_i, grid_i, nx; enforce_first_x = 1)
+    distr_i = [0.0; diff(CDF_i)]         # Marginal distribution (cdf) of liquid assets
+    nx_free = nx - enforce_first_x
+    aux_marginal =
+        collect(range(CDF_i[enforce_first_x + 1]; stop = CDF_i[end], length = nx_free))
+    aux_margin_unif = copy(aux_marginal)
+
+    x2 = 1.0 - 1e-14
+    for i = 1:(nx_free - 1)
+        equi(x1) = equishares(x1, x2, grid_i, distr_i, nx_free)
+        x2 = find_zero(equi, (1e-9, x2))
+        aux_marginal[end - i] = x2
+    end
+
+    aux_marginal[end] = CDF_i[end]
+
+    # produce convex weights
+    if 1 < enforce_first_x
+        λ = 0.001
+    else
+        λ = 0.1
+    end
+    weights = λ .^ collect(range(0; stop = 1, length = nx_free))
+    aux_marginal = [
+        weights[i] * aux_margin_unif[i] + (1 - weights[i]) * m for
+        (i, m) in enumerate(aux_marginal)
+    ] # convex combi
+    copula_marginal = copy(aux_marginal)
+    jlast = length(CDF_i) - 1
+    for i = (nx_free - 1):-1:1
+        j = locate(aux_marginal[i], CDF_i) + 1
+        # ensure that every element in the middle of copula_marginal is unique!
+        if jlast <= j
+            j = max(1, jlast - 1)
+        end
+        jlast = j
+        copula_marginal[i] = CDF_i[j]
+    end
+
+    copula_marginal =
+        enforce_first_x > 0 ? [CDF_i[1:enforce_first_x]; copula_marginal] : copula_marginal
+
+    # restructure if in the beginning, more than one element is CDF_i[1]
+    ix_same = findall(copula_marginal .== CDF_i[1])
+    len_same = length(ix_same)
+    if 1 < len_same
+        k = 0
+        ix_last = length(CDF_i)
+        while length(CDF_i) - 1 - ix_last < len_same
+            k += 1
+            ix_last = findall(CDF_i .== copula_marginal[end - k])[1]
+        end
+        cop_marg_new = copy(copula_marginal)
+        cop_marg_new[1:(nx - len_same - k + 1)] = copula_marginal[len_same:(end - k)]
+        cop_marg_new[(nx - len_same + 2 - k):(end - 1)] =
+            CDF_i[(ix_last + 1):(ix_last + len_same + k - 2)]
+        copula_marginal = cop_marg_new
+    end
+    @assert all(diff(copula_marginal) .> 0)
+    return copula_marginal
+end
+
+"""
     equishares(x1, x2, grid_i, distr_i, nx)
 """
 function equishares(x1, x2, grid_i, distr_i, nx)
@@ -345,4 +322,192 @@ function equishares(x1, x2, grid_i, distr_i, nx)
     dev_equi = Wshares .- 1.0 ./ nx
 
     return dev_equi
+end
+
+function produce_marginals(distrSS::CopulaTwoAssets, n_par::NumericalParameters)
+    dt = typeof(distrSS)
+    copula_marginal_b =
+        copula_marg_equi(get_CDF(distrSS.b, dt), n_par.grid_b, n_par.nb_copula)
+    copula_marginal_k =
+        copula_marg_equi(get_CDF(distrSS.k, dt), n_par.grid_k, n_par.nk_copula)
+    copula_marginal_h =
+        copula_marg_equi_h(get_CDF(distrSS.h, dt), n_par.grid_h, n_par.nh_copula)
+    return copula_marginal_b, copula_marginal_k, copula_marginal_h
+end
+
+function produce_marginals(distrSS::CopulaOneAsset, n_par::NumericalParameters)
+    dt = typeof(distrSS)
+    copula_marginal_b =
+        copula_marg_equi(get_CDF(distrSS.b, dt), n_par.grid_b, n_par.nb_copula)
+    # copula_marginal_b =
+    #     copula_marg_equi_convex(get_CDF(distrSS.b, dt), n_par.grid_b, n_par.nb_copula)
+    copula_marginal_k = [1.0]
+    copula_marginal_h =
+        copula_marg_equi_h(get_CDF(distrSS.h, dt), n_par.grid_h, n_par.nh_copula)
+    isa(n_par.transition_type, NonLinearTransition) &&
+        minimum(diff(copula_marginal_b)) .<= 0.0 &&
+        @warn "Copula marginal for b not strictly monotone, which can cause issues in Fsys with NonLinearTransition."
+    # isa(n_par.transition_type, NonLinearTransition) &&
+    #     minimum(diff(copula_marginal_h)) .<= 0.0 &&
+    #     @warn "Copula marginal for h not strictly monotone, which can cause issues in Fsys with NonLinearTransition."
+    return copula_marginal_b, copula_marginal_k, copula_marginal_h
+end
+
+function produce_marginals(distrSS::Union{CDF,RepAgent}, n_par::NumericalParameters)
+    return [1.0], [1.0], [1.0]
+end
+
+function dimensionality_reduction(
+    vfSS::Union{ValueFunctionsOneAsset,ValueFunctionsTwoAssets},
+    transition_matricesSS::TransitionMatrices,
+    pfSS::PolicyFunctions,
+    args_hh_prob::Vector,
+    m_par::ModelParameters,
+    n_par::NumericalParameters,
+    transition_type::LinearTransition,
+    distribution_states::CopulaStates,
+)
+
+    ## DCT coefficients for marginal value functions --------------------------------------
+
+    # Identify the co-linear variables in arguments of household problem
+    exclude_list = ["N", "Hprog", "Htilde"]
+    include_list_idx = findall(x -> x ∉ exclude_list, args_hh_prob_names)
+
+    compressionIndexesVf, _ = first_stage_reduction(
+        vfSS,
+        transition_matricesSS,
+        pfSS,
+        args_hh_prob,
+        include_list_idx,
+        n_par,
+        m_par,
+    )
+
+    ## Indices for distribution perturbation:
+    # Polynomials indices for copula perturbation and CDF indices for CDF perturbation
+    compressionIndexesDistr = distr_indices(n_par, n_par.distribution_states)
+
+    # Return container to store all retained coefficients in one array
+    return [compressionIndexesVf, compressionIndexesDistr]
+end
+
+function dimensionality_reduction(
+    vfSS::ValueFunctionsOneAsset,
+    transition_matricesSS::TransitionMatrices,
+    pfSS::PolicyFunctions,
+    args_hh_prob::Vector,
+    m_par::ModelParameters,
+    n_par::NumericalParameters,
+    transition_type::NonLinearTransition,
+    distribution_states::CopulaStates,
+)
+
+    ## DCT coefficients for marginal value functions --------------------------------------
+    compressionIndexesVf = select_DCT_indices(vfSS, n_par)
+
+    ## Indices for distribution perturbation:
+    # Polynomials indices for copula perturbation and CDF indices for CDF perturbation
+    compressionIndexesDistr = distr_indices(n_par, n_par.distribution_states)
+
+    # Return container to store all retained coefficients in one array
+    return [compressionIndexesVf, compressionIndexesDistr]
+end
+
+function dimensionality_reduction(
+    vfSS::Union{ValueFunctionsOneAsset,ValueFunctionsTwoAssets},
+    transition_matricesSS::TransitionMatrices,
+    pfSS::PolicyFunctions,
+    args_hh_prob::Vector,
+    m_par::ModelParameters,
+    n_par::NumericalParameters,
+    transition_type::TransitionType,
+    distribution_states::CDFStates,
+)
+
+    # No reduction for value function:
+    compressionIndexesVf = if isa(n_par.model, TwoAsset)
+        [
+            collect(1:(n_par.nb * n_par.nk * n_par.nh)),
+            collect(1:(n_par.nb * n_par.nk * n_par.nh)),
+        ]
+    else
+        [collect(1:(n_par.nb * n_par.nh))]
+    end
+    if isa(n_par.model, OneAsset)
+        @assert n_par.nk == 1
+    end
+    compressionIndexesDistr = collect(1:(n_par.nb * n_par.nh * n_par.nk))
+    return [compressionIndexesVf, compressionIndexesDistr]
+end
+
+function dimensionality_reduction(
+    vfSS::ValueFunctionsCompleteMarkets,
+    transition_matricesSS::TransitionMatricesCompleteMarkets,
+    pfSS::PolicyFunctions,
+    args_hh_prob::Vector,
+    m_par::ModelParameters,
+    n_par::NumericalParameters,
+    transition_type::TransitionType,
+    distribution_states::Union{CDFStates,CopulaStates},
+)
+    return [[[]], collect(1:(n_par.nh))]
+end
+
+function distr_indices(n_par::NumericalParameters, distribution_states::CopulaStates)
+    SELECT = [
+        (!((i == 1) & (j == 1)) & !((k == 1) & (j == 1)) & !((k == 1) & (i == 1))) for
+        i = 1:(n_par.nb_copula), j = 1:(n_par.nk_copula), k = 1:(n_par.nh_copula)
+    ]
+
+    # return indices of selected coeffs
+    return findall(SELECT[:])
+end
+
+function distr_indices(n_par::NumericalParameters, distribution_states::CDFStates)
+    return collect(1:(n_par.nb * n_par.nh * n_par.nk))
+end
+
+ntotal(n_par, compressionIndexes, ::Union{OneAsset,TwoAsset}, ::CDFStates) =
+    length(vcat(vcat(compressionIndexes...)...)) - 1 + n_par.naggr
+ntotal(n_par, compressionIndexes, ::TwoAsset, ::CopulaStates) =
+    length(vcat(vcat(compressionIndexes...)...)) +
+    (n_par.nh + n_par.nb + n_par.nk - 3 + n_par.naggr)
+ntotal(n_par, compressionIndexes, ::OneAsset, ::CopulaStates) =
+    length(vcat(vcat(compressionIndexes...)...)) + (n_par.nh + n_par.nb - 2 + n_par.naggr)
+ntotal(n_par, compressionIndexes, ::CompleteMarkets, ::Union{CDFStates,CopulaStates}) =
+    length(vcat(vcat(compressionIndexes...)...)) - 1 + n_par.naggr
+
+nstates(n_par, compressionIndexesDistr, ::Union{OneAsset,TwoAsset}, ::CDFStates) =
+    length(compressionIndexesDistr) - 1 + n_par.naggrstates
+nstates(n_par, compressionIndexesDistr, ::TwoAsset, ::CopulaStates) =
+    n_par.nh + n_par.nk + n_par.nb - 3 + n_par.naggrstates + length(compressionIndexesDistr)
+nstates(n_par, compressionIndexesDistr, ::OneAsset, ::CopulaStates) =
+    n_par.nh + n_par.nb - 2 + n_par.naggrstates + length(compressionIndexesDistr)
+nstates(
+    n_par,
+    compressionIndexesDistr,
+    ::CompleteMarkets,
+    ::Union{CDFStates,CopulaStates},
+) = length(compressionIndexesDistr) - 1 + n_par.naggrstates
+
+function set_npar_sizes(n_par, compressionIndexes)
+    @set! n_par.ntotal =
+        ntotal(n_par, compressionIndexes, n_par.model, n_par.distribution_states)
+    @set! n_par.nstates =
+        nstates(n_par, compressionIndexes[2], n_par.model, n_par.distribution_states)
+    @set! n_par.ncontrols = length(vcat(compressionIndexes[1]...)) + n_par.naggrcontrols
+    @set! n_par.LOMstate_save = zeros(n_par.nstates, n_par.nstates)
+    @set! n_par.State2Control_save = zeros(n_par.ncontrols, n_par.nstates)
+    @set! n_par.nstates_r = copy(n_par.nstates)
+    @set! n_par.ncontrols_r = copy(n_par.ncontrols)
+    @set! n_par.ntotal_r = copy(n_par.ntotal)
+    @set! n_par.PRightStates = Diagonal(ones(n_par.nstates))
+    @set! n_par.PRightAll = Diagonal(ones(n_par.ntotal))
+
+    if n_par.n_agg_eqn != n_par.naggr - length(n_par.distr_names)
+        @warn "Inconsistency in number of aggregate variables and equations!"
+    end
+
+    return n_par
 end

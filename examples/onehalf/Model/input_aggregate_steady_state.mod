@@ -87,7 +87,7 @@ nxSS = exp((RBSS - 1.0) * log(B12SS))
 # financial market
 LP$SS = RK$SS / (RB$SS / π$SS)
 LPXA$SS = LP$SS
-BD$SS = -sum(distr_bSS .* (n_par.grid_b .< 0) .* n_par.grid_b)
+BD$SS = -aggregate_asset(distrSS, :b, n_par, 0.0)
 qΠ$SS = (m_par.ωΠ .* Π_F$SS) ./ (RB$SS / πCPI$SS .- 1 .+ m_par.ιΠ) .+ 1.0
 Bgov$SS = B$SS .- (qΠ$SS .- 1.0) .+ log(B12SS) .* relsize
 BgovSS = BSS .- (qΠSS .- 1.0) - log(B12SS) ./ rerSS

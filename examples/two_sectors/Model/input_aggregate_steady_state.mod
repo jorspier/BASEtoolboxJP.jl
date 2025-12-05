@@ -33,7 +33,7 @@ ISS = m_par.δ_0 * KSS
 Π_ESS = Π_SSS
 
 # financial market
-BDSS = -sum(distr_bSS .* (n_par.grid_b .< 0) .* n_par.grid_b)
+BDSS = -aggregate_asset(distrSS, :b, n_par, 0.0)
 BgovSS = BSS
 TotalAssetsSS = BSS + qSS * KSS
 

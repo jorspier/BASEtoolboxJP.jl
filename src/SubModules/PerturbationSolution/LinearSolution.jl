@@ -1,28 +1,37 @@
-@doc raw"""
-    LinearSolution(sr, m_par, A, B; allow_approx_sol = true, ss_only = false)
+"""
+    LinearSolution(sr, m_par, A, B; allow_approx_sol=true, ss_only=false)
 
-Calculate the linearized solution to the non-linear difference equations defined
-by function [`Fsys()`](@ref), using Schmitt-Grohé & Uribe (JEDC 2004) style linearization
-(apply the implicit function theorem to obtain linear observation and
-state transition equations).
+Calculate the linearized solution to the non-linear difference equations defined by function
+[`Fsys()`](@ref), using Schmitt-Grohé & Uribe (JEDC 2004) style linearization (apply the
+implicit function theorem to obtain linear observation and state transition equations).
 
 The Jacobian is calculated using the package `ForwardDiff`
 
+This function computes the first-order derivatives of the equilibrium conditions with
+respect to states and controls, constructs the linear system, and solves it. It handles the
+idiosyncratic part of the Jacobian efficiently by exploiting known derivatives (see
+[`set_known_derivatives_distr!`](@ref)) and using automatic differentiation for the rest.
+
 # Arguments
-- `sr`: steady-state structure (variable values, indexes, numerical parameters, ...)
-- `A`,`B`: derivative of [`Fsys()`](@ref) with respect to arguments `X` [`B`] and
-    `XPrime` [`A`]
-- `m_par`: model parameters
-- `allow_approx_sol`: if `true`, the function will attempt to solve the linearized model
-    even if the system is indeterminate (shifting the critical eigenvalues)
-- `ss_only`: if `true`, the function will only check if the steady state is a solution
+
+  - `sr`: steady-state structure (variable values, indexes, numerical parameters, ...).
+  - `m_par`: model parameters.
+  - `A`,`B`: derivative of [`Fsys()`](@ref) with respect to arguments `X` [`B`] and `XPrime`
+    [`A`]. Can be initialized as zero matrices.
+  - `allow_approx_sol`: if `true` (default), the function will attempt to solve the
+    linearized model even if the system is indeterminate (shifting the critical
+    eigenvalues).
+  - `ss_only`: if `true`, the function will only check if the steady state is a solution
+    (i.e., if `Fsys` evaluates to zero at steady state) and return the residuals.
 
 # Returns
-- `gx`,`hx`: observation equations [`gx`] and state transition equations [`hx`]
-- `alarm_LinearSolution`,`nk`: `alarm_LinearSolution=true` when solving algorithm fails, `nk` number of
-    predetermined variables
-- `A`,`B`: first derivatives of [`Fsys()`](@ref) with respect to arguments `X` [`B`] and
-    `XPrime` [`A`]
+
+  - `gx`: observation equations matrix (mapping states to controls).
+  - `hx`: state transition equations matrix (mapping states to future states).
+  - `alarm_LinearSolution`: `true` if the solution algorithm fails or is indeterminate.
+  - `nk`: number of predetermined variables (states).
+  - `A`,`B`: first derivatives of [`Fsys()`](@ref) with respect to arguments `X` [`B`] and
+    `XPrime` [`A`].
 """
 function LinearSolution(
     sr,
@@ -32,27 +41,17 @@ function LinearSolution(
     allow_approx_sol = true,
     ss_only = false,
 )
-    ############################################################################
-    # Prepare elements used for uncompression
-    ############################################################################
-    # Matrices to take care of reduced degree of freedom in marginal distributions
-    Γ = shuffleMatrix(sr.distrSS, sr.n_par.nb, sr.n_par.nk, sr.n_par.nh)
-    # Matrices for discrete cosine transforms
-    DC = Array{Array{Float64,2},1}(undef, 3)
-    DC[1] = mydctmx(sr.n_par.nb)
-    DC[2] = mydctmx(sr.n_par.nk)
-    DC[3] = mydctmx(sr.n_par.nh)
-    IDC = [DC[1]', DC[2]', DC[3]']
+    ## --------------------------------------------------------------------------
+    ## Prepare elements used for uncompression
+    ## --------------------------------------------------------------------------
 
-    DCD = Array{Array{Float64,2},1}(undef, 3)
-    DCD[1] = mydctmx(sr.n_par.nb_copula)
-    DCD[2] = mydctmx(sr.n_par.nk_copula)
-    DCD[3] = mydctmx(sr.n_par.nh_copula)
-    IDCD = [DCD[1]', DCD[2]', DCD[3]']
+    transform_elements =
+        transformation_elements(sr, sr.n_par.model, sr.n_par.distribution_states)
 
-    ############################################################################
-    # Check whether Steady state solves the difference equation
-    ############################################################################
+    ## --------------------------------------------------------------------------
+    ## Check whether Steady state solves the difference equation
+    ## --------------------------------------------------------------------------
+
     length_X0 = sr.n_par.ntotal
     X0 = zeros(length_X0) .+ ForwardDiff.Dual(0.0, 0.0)
     F = Fsys(
@@ -62,12 +61,8 @@ function LinearSolution(
         m_par,
         sr.n_par,
         sr.indexes,
-        Γ,
         sr.compressionIndexes,
-        DC,
-        IDC,
-        DCD,
-        IDCD,
+        transform_elements,
     )
 
     FR = realpart.(F)
@@ -93,22 +88,39 @@ function LinearSolution(
         @printf "Number of States and Controls: %d\n" length(F)
         @printf "Max error on Fsys: %.2e\n" maximum(abs.(FR[:]))
         if typeof(sr.n_par.model) != CompleteMarkets
-            @printf "Max error of COP in Fsys: %.2e\n" maximum(abs.(FR[sr.indexes.COP]))
-            @printf "Max error of Wb in Fsys: %.2e\n" maximum(abs.(FR[sr.indexes.Wb]))
-            if typeof(sr.n_par.model) == TwoAsset
-                @printf "Max error of Wk in Fsys: %.2e\n" maximum(abs.(FR[sr.indexes.Wk]))
+            for field in propertynames(sr.indexes.distr)
+                @printf "Max error of distribution %s in Fsys: %.2e\n" field maximum(
+                    abs.(FR[getfield(sr.indexes.distr, field)]),
+                )
+            end
+            for field in propertynames(sr.indexes.valueFunction)
+                @printf "Max error of value function %s in Fsys: %.2e\n" field maximum(
+                    abs.(FR[getfield(sr.indexes.valueFunction, field)]),
+                )
             end
         end
     end
 
-    ############################################################################
-    # Calculate Jacobians of the Difference equation F
-    ############################################################################
-    # BA  = ForwardDiff.jacobian(x-> Fsys(x[1:length_X0], x[length_X0+1:end],
-    #                 sr.XSS, m_par, sr.n_par, sr.indexes, Γ, sr.compressionIndexes, DC, IDC, DCD, IDCD), zeros(2*length_X0))
+    ## --------------------------------------------------------------------------
+    ## Calculate Jacobians of the Difference equation F
+    ## --------------------------------------------------------------------------
+    # BA = ForwardDiff.jacobian(
+    #     x -> Fsys(
+    #         x[1:length_X0],
+    #         x[(length_X0 + 1):end],
+    #         sr.XSS,
+    #         m_par,
+    #         sr.n_par,
+    #         sr.indexes,
+    #         sr.compressionIndexes,
+    #         transform_elements,
+    #     ),
+    #     zeros(2 * length_X0),
+    # )
 
-    # B   = BA[:,1:length_X0]
-    # A   = BA[:,length_X0+1:end]
+    # B = BA[:, 1:length_X0]
+    # A = BA[:, (length_X0 + 1):end]
+
     f(x) = Fsys(
         x[1:length_X0],
         x[(length_X0 + 1):end],
@@ -116,13 +128,12 @@ function LinearSolution(
         m_par,
         sr.n_par,
         sr.indexes,
-        Γ,
         sr.compressionIndexes,
-        DC,
-        IDC,
-        DCD,
-        IDCD,
+        transform_elements,
     )
+
+    # with known derivatives
+    # -----------
 
     function manip_some(x, indexes, lengthy)
         y = zeros(eltype(x), lengthy)
@@ -133,16 +144,26 @@ function LinearSolution(
     B = zeros(length_X0, length_X0)
 
     dist_indexes =
-        [sr.indexes.distr_b; sr.indexes.distr_k; sr.indexes.distr_h; sr.indexes.COP] # changes in marginal distributions at time t+1 affect t+1 copula errors
-    V_indexes = [sr.indexes.Wb; sr.indexes.Wk]
+        vcat([getfield(sr.indexes.distr, d) for d in propertynames(sr.indexes.distr)]...)
+    V_indexes = vcat(
+        [
+            getfield(sr.indexes.valueFunction, v) for
+            v in propertynames(sr.indexes.valueFunction)
+        ]...,
+    )
 
     not_dist_indexes = setdiff(1:length_X0, dist_indexes)
     not_V_indexes = setdiff(1:length_X0, V_indexes)
-    # Derivatives with respect to time t+1 distributions are known (unit/shuffle mat)
-    A[dist_indexes, dist_indexes] = -I[1:length(dist_indexes), 1:length(dist_indexes)]
-    A[sr.indexes.distr_b, sr.indexes.distr_b] = -Γ[1][1:(end - 1), :]
-    A[sr.indexes.distr_k, sr.indexes.distr_k] = -Γ[2][1:(end - 1), :]
-    A[sr.indexes.distr_h, sr.indexes.distr_h] = -Γ[3][1:(end - 1), :]
+
+    set_known_derivatives_distr!(
+        A,
+        dist_indexes,
+        transform_elements,
+        sr.indexes.distr,
+        sr.n_par,
+        sr.n_par.transition_type,
+        sr.n_par.transf_CDF,
+    )
     # Derivatives with respect to time t value functions are known (unit matrix)
     B[V_indexes, V_indexes] = I[1:length(V_indexes), 1:length(V_indexes)]
 
@@ -155,9 +176,9 @@ function LinearSolution(
         zeros(length(not_V_indexes)),
     )
 
-    ######################################
-    # Solve the linearized model: Policy Functions and LOMs
-    ############################################################################
+    ## --------------------------------------------------------------------------
+    ## Solve the linearized model: Policy Functions and LOMs
+    ## --------------------------------------------------------------------------
     gx, hx, alarm_LinearSolution, nk = SolveDiffEq(A, B, sr.n_par, allow_approx_sol)
 
     if sr.n_par.verbose
@@ -165,4 +186,164 @@ function LinearSolution(
     end
 
     return gx, hx, alarm_LinearSolution, nk, A, B
+end
+
+function set_known_derivatives_distr!(
+    A,
+    dist_indexes,
+    transform_elements::TransformationElements,
+    indexes::CopulaTwoAssetsIndexes,
+    n_par::NumericalParameters,
+    ::LinearTransition,
+    ::Union{LinearTransformation,ParetoTransformation},
+)
+    # Derivatives with respect to time t+1 distributions are known (unit/shuffle mat)
+    A[dist_indexes, dist_indexes] = -I[1:length(dist_indexes), 1:length(dist_indexes)]
+    A[indexes.b, indexes.b] = -transform_elements.Γ[1][1:(end - 1), :]
+    A[indexes.k, indexes.k] = -transform_elements.Γ[2][1:(end - 1), :]
+    A[indexes.h, indexes.h] = -transform_elements.Γ[3][1:(end - 1), :]
+end
+
+function set_known_derivatives_distr!(
+    A,
+    dist_indexes,
+    transform_elements::TransformationElements,
+    indexes::CopulaOneAssetIndexes,
+    n_par::NumericalParameters,
+    ::LinearTransition,
+    ::Union{LinearTransformation,ParetoTransformation},
+)
+    # Derivatives with respect to time t+1 distributions are known (unit/shuffle mat)
+    A[dist_indexes, dist_indexes] = -I[1:length(dist_indexes), 1:length(dist_indexes)]
+    A[indexes.b, indexes.b] = -transform_elements.Γ[1][1:(end - 1), :]
+    A[indexes.h, indexes.h] = -transform_elements.Γ[2][1:(end - 1), :]
+end
+
+function set_known_derivatives_distr!(
+    A,
+    dist_indexes,
+    transform_elements::TransformationElements,
+    indexes::CopulaOneAssetIndexes,
+    n_par::NumericalParameters,
+    ::NonLinearTransition,
+    ::Union{LinearTransformation,ParetoTransformation},
+)
+    # Derivatives with respect to time t+1 distributions are known (unit/shuffle mat)
+    A[dist_indexes, dist_indexes] = -I[1:length(dist_indexes), 1:length(dist_indexes)]
+    A[indexes.h, indexes.h] = -transform_elements.Γ[2][1:(end - 1), :]
+end
+
+function set_known_derivatives_distr!(
+    A,
+    dist_indexes,
+    transform_elements::TransformationElements,
+    indexes::CDFIndexes,
+    n_par::NumericalParameters,
+    ::TransitionType,
+    ::LinearTransformation,
+)
+    @assert dist_indexes[1] == 1 "First index in dist_indexes should be 1 for CDFStates."
+    # Derivatives with respect to time t+1 distributions are known (unit/shuffle mat)
+    unit_indices = indexes_unit_derivatives(n_par.nb, n_par.nh)
+    for ci in unit_indices
+        A[ci] = -1.0
+    end
+
+    # The last value of a conditional is the income PDF, which is treated discretely and for
+    # which the shuffle matrix is applied and then cumulated as object of interest is the
+    # joint CDF.
+    shuffled_indices = indexes_shuffled_derivatives(n_par.nb, n_par.nh)
+    shuffle_values = cumsum(transform_elements.Γ[1] .* -1; dims = 1)[1:(end - 1), :][:]
+
+    for (idx, ci) in enumerate(shuffled_indices)
+        A[ci] += shuffle_values[idx]
+    end
+end
+
+function set_known_derivatives_distr!(
+    A,
+    dist_indexes,
+    transform_elements::TransformationElements,
+    indexes::CDFIndexes,
+    n_par::NumericalParameters,
+    ::TransitionType,
+    ::ParetoTransformation,
+)
+    A[dist_indexes, dist_indexes] = -I[1:length(dist_indexes), 1:length(dist_indexes)]
+end
+
+function set_known_derivatives_distr!(
+    A,
+    dist_indexes,
+    transform_elements::TransformationElements,
+    indexes::RepAgentIndexes,
+    n_par::NumericalParameters,
+    ::TransitionType,
+    ::Union{LinearTransformation,ParetoTransformation},
+)
+    A[dist_indexes, dist_indexes] = -I[1:length(dist_indexes), 1:length(dist_indexes)]
+    A[indexes.h, indexes.h] = -transform_elements.Γ[1][1:(end - 1), :]
+end
+
+"""
+    indexes_unit_derivatives(nb, nh)
+
+Get the Cartesian indices for unit derivatives in the distribution matrix with CDF as
+states.
+
+Relevant indices for the unit derivative follow from the perturbation of a state itself and
+the indices following from the cumsum.
+
+# Arguments
+
+  - `nb`: Number of grid points for liquid assets.
+  - `nh`: Number of grid points for human capital.
+
+# Returns
+
+  - `indices`: Vector of `CartesianIndex{2}` representing the locations in the matrix.
+"""
+function indexes_unit_derivatives(nb, nh)
+    indices = []
+    i_count = 1
+    for h = 1:nh, i = 1:(nb - 1), j = 1:nh
+        row = i + nb * (h - 1) + nb * (j - 1)
+        col = i + nb * (j - 1)
+        if 0 < row <= nb * nh
+            push!(indices, CartesianIndex(row, col))
+            i_count += 1
+        end
+    end
+    return indices
+end
+
+"""
+    indexes_shuffled_derivatives(nb, nh)
+
+Get the Cartesian indices for the non-unit derivatives in the distribution matrix with CDF
+as states.
+
+Relevant indices are the end of each conditional (except the last one) and indices following
+from the cumsum logic used in the shuffle matrix.
+
+# Arguments
+
+  - `nb`: Number of grid points for liquid assets.
+  - `nh`: Number of grid points for human capital.
+
+# Returns
+
+  - `indices`: Vector of `CartesianIndex{2}` representing the locations in the matrix.
+"""
+function indexes_shuffled_derivatives(nb, nh)
+    total_count = (nh - 1)^2
+    indices = Vector{CartesianIndex{2}}(undef, total_count)
+    i_count = 1
+    for ih1 = 1:(nh - 1)
+        for ih2 = 1:(nh - 1)
+            indices[i_count] = CartesianIndex(ih2 * nb, ih1 * nb)
+            i_count += 1
+        end
+    end
+    return indices
 end
