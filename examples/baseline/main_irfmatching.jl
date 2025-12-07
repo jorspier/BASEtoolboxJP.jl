@@ -50,7 +50,7 @@ e_set = EstimationSettings(;
         :LPXA, # Ex-ante liquidity premium
     ],
     max_iter_mode = 2000,
-    f_reltol = 1.0e-6,
+    f_tol = 1.0e-6,
     x_tol = 1.0e-8,
     ndraws = 1500,
     burnin = 6000,
