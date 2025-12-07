@@ -70,7 +70,7 @@ const ORIG_STDERR = stderr
 """
     unmute_println(xs...)
 
-Print the given arguments to the original stdout (LoggingTools.ORIG_STDOUT), bypassing any
+Print the given arguments to the original stdout (Tools.ORIG_STDOUT), bypassing any
 redirection of Base.stdout that may be in effect.
 
 Arguments
@@ -79,23 +79,23 @@ Arguments
 
 Returns
 
-  - `nothing`. Side effect: writes a newline-terminated line to `LoggingTools.ORIG_STDOUT`.
+  - `nothing`. Side effect: writes a newline-terminated line to `Tools.ORIG_STDOUT`.
 
 Notes
 
   - This is useful when output has been redirected (e.g., via `redirect_stdout`) but you
     still want to emit a message to the original terminal or log sink that was captured in
-    `LoggingTools.ORIG_STDOUT`.
-  - Does not change the current stdout; only writes directly to `LoggingTools.ORIG_STDOUT`.
+    `Tools.ORIG_STDOUT`.
+  - Does not change the current stdout; only writes directly to `Tools.ORIG_STDOUT`.
 """
 function unmute_println(xs...)
-    println(LoggingTools.ORIG_STDOUT, xs...)
+    println(Tools.ORIG_STDOUT, xs...)
 end
 
 """
     unmute_printf(fmt::AbstractString, args...)
 
-Write a formatted string to the original stdout (LoggingTools.ORIG_STDOUT) using
+Write a formatted string to the original stdout (Tools.ORIG_STDOUT) using
 `Printf`-style formatting, bypassing any redirection of Base.stdout.
 
 Arguments
@@ -106,7 +106,7 @@ Arguments
 Returns
 
   - `nothing`. Side effect: writes the formatted output (without adding an extra newline) to
-    `LoggingTools.ORIG_STDOUT`.
+    `Tools.ORIG_STDOUT`.
 
 Notes
 
@@ -116,7 +116,7 @@ Notes
     argument mismatches propagate the usual `Printf` errors.
 """
 function unmute_printf(fmt::AbstractString, args...)
-    print(LoggingTools.ORIG_STDOUT, Printf.format(Printf.Format(fmt), args...))
+    print(Tools.ORIG_STDOUT, Printf.format(Printf.Format(fmt), args...))
 end
 
 """
