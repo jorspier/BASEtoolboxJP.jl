@@ -179,7 +179,7 @@ nice_var_names =
 
 shocks_to_plot = [(:Gshock, "Structural deficit")]
 vars_to_plot = [(select_variables[i], nice_var_names[i]) for i in eachindex(select_variables)]
-IRFs_to_plot = [(IRFs_mc, "HANK Posterior")]
+IRFs_to_plot = [(IRFs_mc, "Mode")]
 
 plot_irfs(
     shocks_to_plot,

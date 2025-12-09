@@ -267,7 +267,7 @@ plot_irfs(
         (:TOP10Wshare, "Top 10 wealth share"),
         (:TOP10Ishare, "Top 10 inc. share"),
     ],
-    [(IRFs_mc, "HANK Mode"), (IRFs_mode, "HANK Posterior")],
+    [(IRFs_mc, "Posterior mean"), (IRFs_mode, "Mode")],
     IRFs_order,
     sr_mc.indexes_r;
     show_fig = false,
@@ -322,7 +322,7 @@ plot_vardecomp(
         (:TOP10Wshare, "Top 10 wealth share"),
         (:TOP10Ishare, "Top 10 inc. share"),
     ],
-    [(VDs_mc, "HANK Mode"), (VDs_mode, "HANK Posterior")],
+    [(VDs_mc, "Posterior mean"), (VDs_mode, "Mode")],
     IRFs_order,
     sr_mc.indexes_r;
     show_fig = false,
@@ -345,7 +345,7 @@ plot_vardecomp(
         (:TOP10Wshare, "Top 10 wealth share"),
         (:TOP10Ishare, "Top 10 inc. share"),
     ],
-    [(VDs_mc, "HANK Mode"), (VDs_mode, "HANK Posterior")],
+    [(VDs_mc, "Posterior mean"), (VDs_mode, "Mode")],
     IRFs_order,
     sr_mc.indexes_r;
     shock_categories = Dict(
@@ -373,7 +373,7 @@ plot_vardecomp_bcfreq(
         (:TOP10Wshare, "Top 10 wealth share"),
         (:TOP10Ishare, "Top 10 inc. share"),
     ],
-    [(VDbcs_mc, "HANK Mode"), (VDbcs_mode, "HANK Posterior")],
+    [(VDbcs_mc, "Posterior mean"), (VDbcs_mode, "Mode")],
     IRFs_order,
     sr_mc.indexes_r;
     show_fig = false,
@@ -396,7 +396,7 @@ plot_vardecomp_bcfreq(
         (:TOP10Wshare, "Top 10 wealth share"),
         (:TOP10Ishare, "Top 10 inc. share"),
     ],
-    [(VDbcs_mc, "HANK Mode"), (VDbcs_mode, "HANK Posterior")],
+    [(VDbcs_mc, "Posterior mean"), (VDbcs_mode, "Mode")],
     IRFs_order,
     sr_mc.indexes_r;
     shock_categories = Dict(
