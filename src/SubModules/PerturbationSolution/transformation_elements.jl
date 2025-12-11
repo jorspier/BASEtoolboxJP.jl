@@ -74,6 +74,31 @@ end
 
 function transformation_elements(
     sr::SteadyResults,
+    model::OneAsset,
+    distribution_states::CopulaStates,
+)
+    PDFSS = cdf_to_pdf(sr.distrSS.COP)
+    # Matrices to take care of reduced degree of freedom in marginal distributions
+    Γ = shuffleMatrix(PDFSS)
+    # Matrices for discrete cosine transforms
+    DC = Array{Array{Float64,2},1}(undef, 2)
+    DC[1] = mydctmx(sr.n_par.nb)
+    DC[2] = mydctmx(sr.n_par.nh)
+    IDC = [DC[1]', DC[2]']
+
+    DCD = Array{Array{Float64,2},1}(undef, 2)
+    DCD[1] = mydctmx(sr.n_par.nb_copula)
+    DCD[2] = mydctmx(sr.n_par.nh_copula)
+    IDCD = [DCD[1]', DCD[2]']
+
+    # does not apply here
+    pareto_indices = []
+
+    return TransformationElements(Γ, DC, IDC, DCD, IDCD, pareto_indices)
+end
+
+function transformation_elements(
+    sr::SteadyResults,
     model::CompleteMarkets,
     distribution_states::Union{CDFStates,CopulaStates},
 )
