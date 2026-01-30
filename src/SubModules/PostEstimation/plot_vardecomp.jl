@@ -67,6 +67,7 @@ function plot_vardecomp(
         "#0000ff",
         "#ccccff",
         :grey,
+        "#660066", # new color for gov investment shock (check palette to match previous papers)
     ],
     show_fig::Bool = true,
     save_fig::Bool = false,
@@ -256,6 +257,7 @@ function plot_vardecomp_bcfreq(
         "#0000ff",
         "#ccccff",
         :grey,
+        "#660066", # new color for gov investment shock (check palette to match previous papers)
     ],
     show_fig::Bool = true,
     save_fig::Bool = false,

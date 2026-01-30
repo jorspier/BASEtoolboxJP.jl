@@ -65,6 +65,8 @@ function plot_hist_decomp(
         "#0000ff",
         "#ccccff",
         :grey,
+        "#660066", # two new colors added
+        "#ffff99",
     ],
     show_fig::Bool = true,
     save_fig::Bool = false,
