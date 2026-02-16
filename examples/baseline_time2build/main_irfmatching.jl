@@ -1,7 +1,6 @@
 """
-Mainboard for the baseline example of the BASEforHANK package.
+Mainboard for the baseline example of the BASEforHANK package, IRF matching version.
 """
-global_start_time = time()
 
 using PrettyTables, Printf, BenchmarkTools;
 
@@ -18,14 +17,14 @@ paths = Dict(
     "src" => joinpath(root_dir, "src"),
     "bld" => joinpath(root_dir, "bld"),
     "src_example" => @__DIR__,
-    "bld_example" => replace(@__DIR__, "examples" => "bld") * "_estim",
+    "bld_example" => replace(@__DIR__, "examples" => "bld") * "_irfmatching",
 );
 
 # create bld directory for the current example
 mkpath(paths["bld_example"]);
 
 # pre-process user inputs for model setup
-include(paths["src"] * "/Preprocessor/PreprocessInputs.jl")
+include(paths["src"] * "/Preprocessor/PreprocessInputs.jl");
 include(paths["src"] * "/BASEforHANK.jl");
 using .BASEforHANK;
 
@@ -41,12 +40,33 @@ m_par = ModelParameters();
 priors = collect(metaflatten(m_par, prior));
 par_prior = mode.(priors);
 m_par = BASEforHANK.Flatten.reconstruct(m_par, par_prior);
-e_set = BASEforHANK.e_set;
+e_set = EstimationSettings(;
+    irf_matching = true,
+    observed_vars_input = [
+        :G, # Government Spending
+        :Y, # Output
+        :B, # Bonds
+        :I, # Investment
+        :LPXA, # Ex-ante liquidity premium
+    ],
+    max_iter_mode = 2000,
+    f_tol = 1.0e-6,
+    x_tol = 1.0e-8,
+    ndraws = 1500,
+    burnin = 6000,
+    mhscale = 0.2,
+    compute_hessian = true,
+    irf_matching_dict = Dict(
+        "irfs_to_plot" => paths["src_example"] * "/Data/irf_data_0706_inclPC.csv",
+        "irf_horizon" => 15,
+        "scale_responses_by" => :B, # This variable then needs to be in the set of responses. Scaling is done so peak "X" response = 1 i.e., responses are scaled by max of B's responses
+        "irfs_to_target" => paths["src_example"] * "/Data/irf_noisy_0706_inclPC.csv",
+    ),
+);
 
 # set some paths
 @set! e_set.save_mode_file = paths["bld_example"] * "/HANK_mode.jld2";
 @set! e_set.save_posterior_file = paths["bld_example"] * "/HANK_chain.jld2";
-@set! e_set.mode_start_file = paths["src_example"] * "/Data/par_final_dict.txt";
 @set! e_set.data_file = paths["src_example"] * "/Data/bbl_data_inequality.csv";
 
 # fix seed for random number generation
@@ -72,7 +92,6 @@ Bgov = exp.(sr_full.XSS[sr_full.indexes.BgovSS]);
 Y = exp.(sr_full.XSS[sr_full.indexes.YSS]);
 T10W = exp(sr_full.XSS[sr_full.indexes.TOP10WshareSS]);
 G = exp.(sr_full.XSS[sr_full.indexes.GSS]);
-GI = exp.(sr_full.XSS[sr_full.indexes.GISS]);
 fr_borr = BASEforHANK.eval_cdf(sr_full.distrSS, :b, sr_full.n_par, 0.0);
 
 # Display steady state moments
@@ -83,7 +102,6 @@ pretty_table(
         "Capital to Output Ratio" K / Y/4.0
         "Government Debt to Output Ratio" Bgov / Y/4.0
         "Government Spending to Output Ratio" G/Y
-        "Government Investment to Output Ratio" GI/Y
         "TOP 10 Wealth Share" T10W
         "Fraction of Borrower" fr_borr
     ];
@@ -126,12 +144,6 @@ if e_set.estimate_model == true
     er_mode, posterior_mode, smoother_mode, sr_mode, lr_mode, m_par_mode =
         find_mode(sr_reduc, lr_reduc, m_par, e_set)
 
-    # Only relevant output for later plotting will be saved.
-    # If you require all smoother output including the variance estimates
-    # over time, items 4 and 5, comment out the next line.
-    # This increases the hard disk storage significantly.
-    smoother_mode = (0.0, 0.0, smoother_mode[3], 0.0, 0.0, smoother_mode[6], 0.0)
-
     # Stores mode finding results in file e_set.save_mode_file
     jldsave(
         e_set.save_mode_file,
@@ -144,8 +156,7 @@ if e_set.estimate_model == true
         m_par_mode,
         e_set,
     )
-    # !! warning: the provided mode file does not contain smoothed covars (smoother_mode[4] and [5])!!
-    # @load BASEforHANK.e_set.save_mode_file posterior_mode sr_mode lr_mode er_mode m_par_mode smoother_mode
+    # @load e_set.save_mode_file posterior_mode sr_mode lr_mode er_mode m_par_mode smoother_mode
 
     sr_mc,
     lr_mc,
@@ -157,12 +168,6 @@ if e_set.estimate_model == true
     par_final,
     hessian_sym,
     smoother_output = sample_posterior(sr_mode, lr_mode, er_mode, m_par_mode, e_set)
-
-    # Only relevant output for later plotting will be saved.
-    # If you want all smoother output including the variance estimates
-    # over time, items 4 and 5, comment out the next line.
-    # This increases the hard disk storage significantly.
-    smoother_output = (0.0, 0.0, smoother_output[3], 0.0, 0.0, smoother_output[6], 0.0)
 
     # Stores mcmc results in file e_set.save_posterior_file
     jldsave(
@@ -181,7 +186,7 @@ if e_set.estimate_model == true
         e_set,
     )
     # !! The following file is not provided !!
-    #      @load BASEforHANK.e_set.save_posterior_file sr_mc lr_mc er_mc  m_par_mc draws_raw posterior accept_rate par_final hessian_sym smoother_output e_set
+    # @load e_set.save_posterior_file sr_mc lr_mc er_mc m_par_mc draws_raw posterior accept_rate par_final hessian_sym smoother_output e_set
 
     @printf "Estimation... Done. \n"
 end
@@ -200,14 +205,26 @@ exovars = [getfield(sr_mc.indexes_r, shock_names[i]) for i = 1:length(shock_name
 stds_mc = [getfield(m_par_mc, Symbol("σ_", i)) for i in shock_names];
 stds_mode = [getfield(m_par_mode, Symbol("σ_", i)) for i in shock_names];
 
+# Set options for IRF interval computation
+irf_interval_options = Dict(
+    "lr" => lr_mc,
+    "sr" => sr_mc,
+    "n_replic" => 300,
+    "percentile_bounds" => (0.05, 0.95),
+    "draws" => draws_raw,
+    "e_set" => e_set,
+    "m_par" => m_par_mc,
+);
+
 # Compute IRFs
-IRFs_mc, _, IRFs_order = compute_irfs(
+IRFs_mc, _, IRF_lb, IRF_ub, _, _, IRFs_order = compute_irfs(
     exovars,
     lr_mc.State2Control,
     lr_mc.LOMstate,
     sr_mc.XSS,
     sr_mc.indexes_r;
     init_val = stds_mc,
+    irf_interval_options = irf_interval_options,
 );
 IRFs_mode, _, _, = compute_irfs(
     exovars,
@@ -228,15 +245,6 @@ VDbcs_mc, UnconditionalVar_mc =
 VDbcs_mode, UnconditionalVar_mode =
     compute_vardecomp_bcfreq(exovars, stds_mode, lr_mode.State2Control, lr_mode.LOMstate);
 
-# Compute historical decompositions
-ShockContr, ShockContr_order = compute_hist_decomp(
-    exovars,
-    lr_mc.State2Control,
-    lr_mc.LOMstate,
-    smoother_output,
-    sr_mc.indexes_r,
-);
-
 ## ------------------------------------------------------------------------------------------
 ## Graphical outputs
 ## ------------------------------------------------------------------------------------------
@@ -254,14 +262,12 @@ plot_irfs(
         (:A, "Risk premium"),
         (:Rshock, "Mon. policy"),
         (:Gshock, "Structural deficit"),
-        (:GI, "Gov. Investment"),
         (:Tprogshock, "Tax progr."),
         (:Sshock, "Income risk"),
     ],
     [
         (:Ygrowth, "Output growth"),
         (:Cgrowth, "Consumption growth"),
-        (:GI, "Gov. Investment"),
         (:Igrowth, "Investment growth"),
         (:N, "Employment"),
         (:wgrowth, "Wage growth"),
@@ -286,13 +292,12 @@ mkpath(paths["bld_example"] * "/IRFs_cat");
 plot_irfs_cat(
     Dict(
         ("Monetary", "mon") => [:Rshock, :A],
-        ("Fiscal", "fis") => [:Gshock, :Tprogshock, :GI],
+        ("Fiscal", "fis") => [:Gshock, :Tprogshock],
         ("Productivity", "pro") => [:Z, :ZI, :μ, :μw],
     ),
     [
         (:Ygrowth, "Output growth"),
         (:Cgrowth, "Consumption growth"),
-        (:GI, "Gov. Investment"),
         (:Igrowth, "Investment growth"),
         (:N, "Employment"),
         (:wgrowth, "Wage growth"),
@@ -310,7 +315,7 @@ plot_irfs_cat(
     save_fig = true,
     path = paths["bld_example"] * "/IRFs_cat",
     yscale = "standard",
-    style_options = (lw = 2, color = [:blue, :red, :green, :orange], linestyle = [:solid, :dash, :dot]),
+    style_options = (lw = 2, color = [:blue, :red], linestyle = [:solid, :dash]),
 )
 
 mkpath(paths["bld_example"] * "/VDs");
@@ -318,7 +323,6 @@ plot_vardecomp(
     [
         (:Ygrowth, "Output growth"),
         (:Cgrowth, "Consumption growth"),
-        (:GI, "Gov. Investment"),
         (:Igrowth, "Investment growth"),
         (:N, "Employment"),
         (:wgrowth, "Wage growth"),
@@ -342,7 +346,6 @@ plot_vardecomp(
     [
         (:Ygrowth, "Output growth"),
         (:Cgrowth, "Consumption growth"),
-        (:GI, "Gov. Investment"),
         (:Igrowth, "Investment growth"),
         (:N, "Employment"),
         (:wgrowth, "Wage growth"),
@@ -358,7 +361,7 @@ plot_vardecomp(
     sr_mc.indexes_r;
     shock_categories = Dict(
         ("Monetary", "mon") => [:Rshock, :A],
-        ("Fiscal", "fis") => [:Gshock, :Tprogshock, :GI],
+        ("Fiscal", "fis") => [:Gshock, :Tprogshock],
         ("Productivity", "pro") => [:Z, :ZI, :μ, :μw],
     ),
     show_fig = false,
@@ -371,7 +374,6 @@ plot_vardecomp_bcfreq(
     [
         (:Ygrowth, "Output growth"),
         (:Cgrowth, "Consumption growth"),
-        (:GI, "Gov. Investment"),
         (:Igrowth, "Investment growth"),
         (:N, "Employment"),
         (:wgrowth, "Wage growth"),
@@ -395,7 +397,6 @@ plot_vardecomp_bcfreq(
     [
         (:Ygrowth, "Output growth"),
         (:Cgrowth, "Consumption growth"),
-        (:GI, "Gov. Investment"),
         (:Igrowth, "Investment growth"),
         (:N, "Employment"),
         (:wgrowth, "Wage growth"),
@@ -411,7 +412,7 @@ plot_vardecomp_bcfreq(
     sr_mc.indexes_r;
     shock_categories = Dict(
         ("Monetary", "mon") => [:Rshock, :A],
-        ("Fiscal", "fis") => [:Gshock, :Tprogshock, :GI],
+        ("Fiscal", "fis") => [:Gshock, :Tprogshock],
         ("Productivity", "pro") => [:Z, :ZI, :μ, :μw],
     ),
     show_fig = false,
@@ -419,61 +420,34 @@ plot_vardecomp_bcfreq(
     path = paths["bld_example"] * "/VDbcs_cat",
 )
 
-mkpath(paths["bld_example"] * "/HDs");
-plot_hist_decomp(
-    [
-        (:Ygrowth, "Output growth"),
-        (:Cgrowth, "Consumption growth"),
-        (:GI, "Gov. Investment"),
-        (:Igrowth, "Investment growth"),
-        (:N, "Employment"),
-        (:wgrowth, "Wage growth"),
-        (:RB, "Nominal rate"),
-        (:π, "Inflation"),
-        (:σ, "Income risk"),
-        (:Tprog, "Tax progressivity"),
-        (:TOP10Wshare, "Top 10 wealth share"),
-        (:TOP10Ishare, "Top 10 inc. share"),
-    ],
-    ShockContr,
-    ShockContr_order,
-    sr_mc.indexes_r;
-    timeline = collect(1954.75:0.25:2019.75), # adjust
-    show_fig = false,
-    save_fig = true,
-    path = paths["bld_example"] * "/HDs",
-);
-
-mkpath(paths["bld_example"] * "/HDs_cat");
-plot_hist_decomp(
-    [
-        (:Ygrowth, "Output growth"),
-        (:Cgrowth, "Consumption growth"),
-        (:GI, "Gov. Investment"),
-        (:Igrowth, "Investment growth"),
-        (:N, "Employment"),
-        (:wgrowth, "Wage growth"),
-        (:RB, "Nominal rate"),
-        (:π, "Inflation"),
-        (:σ, "Income risk"),
-        (:Tprog, "Tax progressivity"),
-        (:TOP10Wshare, "Top 10 wealth share"),
-        (:TOP10Ishare, "Top 10 inc. share"),
-    ],
-    ShockContr,
-    ShockContr_order,
-    sr_mc.indexes_r;
-    shock_categories = Dict(
-        ("Monetary", "mon") => [:Rshock, :A],
-        ("Fiscal", "fis") => [:Gshock, :Tprogshock, :GI],
-        ("Productivity", "pro") => [:Z, :ZI, :μ, :μw],
-    ),
-    timeline = collect(1954.75:0.25:2019.75), #adjust
-    show_fig = false,
-    save_fig = true,
-    path = paths["bld_example"] * "/HDs_cat",
-);
-
 @printf "\n"
 @printf "Done.\n"
-println("Total Runtime: ", round((time() - global_start_time) / 60; digits=2), " minutes")
+
+## ------------------------------------------------------------------------------------------
+## Outputs specific to IRF matching
+## ------------------------------------------------------------------------------------------
+
+select_variables = irf_interval_options["e_set"].observed_vars_input
+nice_var_names =
+    ["Government Spending", "Output", "Bonds", "Investment", "Liquidity Premium"]
+
+shocks_to_plot = [(:Gshock, "Structural deficit")]
+vars_to_plot =
+    [(select_variables[i], nice_var_names[i]) for i in eachindex(select_variables)]
+IRFs_to_plot = [(IRFs_mc, "Mode")]
+
+plot_irfs(
+    shocks_to_plot,
+    vars_to_plot,
+    IRFs_to_plot,
+    IRFs_order,
+    sr_mc.indexes_r;
+    intervals = [(IRF_lb, IRF_ub)],
+    e_set = e_set,
+    plot_data_irfs = true,
+    show_fig = false,
+    save_fig = true,
+    path = paths["bld_example"] * "/IRFs_matching",
+    yscale = "standard",
+    style_options = (lw = 2, color = [:blue, :red], linestyle = [:solid, :dash]),
+)

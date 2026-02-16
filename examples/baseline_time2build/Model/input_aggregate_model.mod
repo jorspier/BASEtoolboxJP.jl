@@ -163,20 +163,11 @@ F[indexes.TR] =
     (log(TR)) - (log(transfer_scheme(n_par, m_par, args_hh_prob; distr_h = distr_h)))
 # This variable needs to be set for the package!
 
-# Primary deficit shock
-F[indexes.Gshock] = (log(GshockPrime)) - (m_par.ρ_Gshock * log(Gshock))
-
-# Investment shock Law of Motion (ensures that shock is not one period spike)
-F[indexes.GIshock] = (log(GIshockPrime)) - (m_par.ρ_GIshock * log(GIshock))
-
-# Law of Motion for Government Investment
-F[indexes.GI] = (log(GIPrime)) - 
-    (m_par.ρ_GI * log(GI) +
-    (1 - m_par.ρ_GI) * XSS[indexes.GISS]
-    )
-
 # Tax shock
 F[indexes.Tprogshock] = (log(TprogshockPrime)) - (m_par.ρ_Tprogshock * log(Tprogshock))
+
+# Primary deficit shock
+F[indexes.Gshock] = (log(GshockPrime)) - (m_par.ρ_Gshock * log(Gshock))
 
 ## Monetary policy ------------------------------------------------------------------------
 
@@ -297,21 +288,32 @@ F[indexes.I] =
 # Production function
 F[indexes.Y] = (log(Y)) - (log(output(Z, Kserv, N, m_par)))
 
-# TFP
-F[indexes.Z] = (log(ZPrime)) - 
-    (m_par.ρ_Z * log(Z) + 
-    m_par.η_GI * (log(GI) - XSS[indexes.GISS]) + # new govt investment shock
-    log(Zshock) #added TFP shock term to have TFP fluctautions without investments
-    )
-
-# Law of motion for the TFP shock
-F[indexes.Zshock] = (log(ZshockPrime)) - (m_par.ρ_Zshock * log(Zshock))
+# Capital utilisation: optimality condition for utilization
+F[indexes.u] = (log(MPKserv)) - (log(q * (δ_1 + δ_2 * (u - 1.0))))
 
 # Investment-good productivity
 F[indexes.ZI] = (log(ZIPrime)) - (m_par.ρ_ZI * log(ZI))
 
-# Capital utilisation: optimality condition for utilization
-F[indexes.u] = (log(MPKserv)) - (log(q * (δ_1 + δ_2 * (u - 1.0))))
+## Government investment ---------------------------------------------------------------------
+
+# Investment shock Law of Motion (ensures that shock is not one period spike)
+F[indexes.GI] = (log(GIPrime)) - (m_par.ρ_GI * log(GI) + 
+    (1.0 - m_par.ρ_GI) * XSS[indexes.GISS])
+
+# Pipeline (stock) of public capital
+F[indexes.Sp] = (log(SpPrime)) - (log((1.0 - m_par.ϕ_GI) * Sp + GI))
+
+# Finished public capital
+F[indexes.KG] = (log(KGPrime)) - (log((1.0 - m_par.δ_KG) * KG + m_par.ϕ_GI * SpPrime))
+
+# Law of motion for the TFP shock
+F[indexes.TFP] = (log(TFPPrime)) - (m_par.ρ_TFP * log(TFP))
+
+# Effective TFP
+F[indexes.Z] = (log(ZPrime)) - 
+    (log(TFPPrime) + 
+     m_par.η_KG * (log(KGPrime) - XSS[indexes.KGSS]) # Prime to not have additional period lag
+    )
 
 ## Asset markets --------------------------------------------------------------------------
 
