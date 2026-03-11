@@ -104,6 +104,24 @@ jldsave(paths["bld_example"] * "/linearresults.jld2", true; lr_full);
 sr_reduc = model_reduction(sr_full, lr_full, m_par);
 lr_reduc = update_model(sr_reduc, lr_full, m_par);
 
+# Eigenvalue diagnostics
+using LinearAlgebra
+eigenvals = eigvals(n_par.nstates_r)
+eigenvals_sorted = sort(abs.(eigenvals), rev=true)
+
+@printf "\n=== State Space Check ===\n"
+@printf "Number of states: %d (expected: 267)\n" size(n_par.nstates_r, 1)
+
+@printf "\nTop 15 eigenvalues:\n"
+for i in 1:min(15, length(eigenvals_sorted))
+    @printf "  %2d: %.10f" i eigenvals_sorted[i]
+    if i < length(eigenvals_sorted) && abs(eigenvals_sorted[i] - eigenvals_sorted[i+1]) < 1e-8
+        @printf "  ← DUPLICATE"
+    end
+    @printf "\n"
+end
+@printf "\n"
+
 # save the reduction
 jldsave(paths["bld_example"] * "/reduction.jld2", true; sr_reduc, lr_reduc);
 
@@ -117,7 +135,7 @@ jldsave(paths["bld_example"] * "/reduction.jld2", true; sr_reduc, lr_reduc);
 ## Estimation
 ## ------------------------------------------------------------------------------------------
 
-if e_set.estimate_model == false
+if e_set.estimate_model == true
     @printf "\n"
     @printf "Estimation...\n"
 
@@ -246,7 +264,6 @@ ShockContr, ShockContr_order = compute_hist_decomp(
 mkpath(paths["bld_example"] * "/IRFs");
 plot_irfs(
     [
-        (:Z, "Effective TFP"),
         (:TFP, "TFP"),
         (:ZI, "Inv.-spec. tech."),
         (:μ, "Price markup"),
@@ -267,7 +284,7 @@ plot_irfs(
         (:RB, "Nominal rate"),
         (:π, "Inflation"),
         (:σ, "Income risk"),
-        (:GI, "Gov. Investment"),
+        #(:GI, "Gov. Investment"),
         (:Sp, "Public capital in construction"),
         (:KG, "Finished public capital"),
         (:Tprog, "Tax progressivity"),
@@ -289,7 +306,7 @@ plot_irfs_cat(
     Dict(
         ("Monetary", "mon") => [:Rshock, :A],
         ("Fiscal", "fis") => [:Gshock, :Tprogshock, :GI],
-        ("Productivity", "pro") => [:Z, :TFP, :ZI, :μ, :μw],
+        ("Productivity", "pro") => [:TFP, :ZI, :μ, :μw],
     ),
     [
         (:Ygrowth, "Output growth"),
@@ -300,7 +317,7 @@ plot_irfs_cat(
         (:RB, "Nominal rate"),
         (:π, "Inflation"),
         (:σ, "Income risk"),
-        (:GI, "Gov. Investment"),
+        #(:GI, "Gov. Investment"),
         (:Sp, "Public capital in construction"),
         (:KG, "Finished public capital"),
         (:Tprog, "Tax progressivity"),
@@ -328,7 +345,7 @@ plot_vardecomp(
         (:RB, "Nominal rate"),
         (:π, "Inflation"),
         (:σ, "Income risk"),
-        (:GI, "Gov. Investment"),
+        #(:GI, "Gov. Investment"),
         (:Sp, "Public capital in construction"),
         (:KG, "Finished public capital"),
         (:Tprog, "Tax progressivity"),
@@ -354,7 +371,7 @@ plot_vardecomp(
         (:RB, "Nominal rate"),
         (:π, "Inflation"),
         (:σ, "Income risk"),
-        (:GI, "Gov. Investment"),
+        #(:GI, "Gov. Investment"),
         (:Sp, "Public capital in construction"),
         (:KG, "Finished public capital"),
         (:Tprog, "Tax progressivity"),
@@ -367,7 +384,7 @@ plot_vardecomp(
     shock_categories = Dict(
         ("Monetary", "mon") => [:Rshock, :A],
         ("Fiscal", "fis") => [:Gshock, :Tprogshock, :GI],
-        ("Productivity", "pro") => [:Z, :TFP, :ZI, :μ, :μw],
+        ("Productivity", "pro") => [:TFP, :ZI, :μ, :μw],
     ),
     show_fig = false,
     save_fig = true,
@@ -385,7 +402,7 @@ plot_vardecomp_bcfreq(
         (:RB, "Nominal rate"),
         (:π, "Inflation"),
         (:σ, "Income risk"),
-        (:GI, "Gov. Investment"),
+        #(:GI, "Gov. Investment"),
         (:Sp, "Public capital in construction"),
         (:KG, "Finished public capital"),
         (:Tprog, "Tax progressivity"),
@@ -411,7 +428,7 @@ plot_vardecomp_bcfreq(
         (:RB, "Nominal rate"),
         (:π, "Inflation"),
         (:σ, "Income risk"),
-        (:GI, "Gov. Investment"),
+        #(:GI, "Gov. Investment"),
         (:Sp, "Public capital in construction"),
         (:KG, "Finished public capital"),
         (:Tprog, "Tax progressivity"),
@@ -424,7 +441,7 @@ plot_vardecomp_bcfreq(
     shock_categories = Dict(
         ("Monetary", "mon") => [:Rshock, :A],
         ("Fiscal", "fis") => [:Gshock, :Tprogshock, :GI],
-        ("Productivity", "pro") => [:Z, :TFP, :ZI, :μ, :μw],
+        ("Productivity", "pro") => [:TFP, :ZI, :μ, :μw],
     ),
     show_fig = false,
     save_fig = true,
@@ -442,7 +459,7 @@ plot_hist_decomp(
         (:RB, "Nominal rate"),
         (:π, "Inflation"),
         (:σ, "Income risk"),
-        (:GI, "Gov. Investment"),
+        #(:GI, "Gov. Investment"),
         (:Sp, "Public capital in construction"),
         (:KG, "Finished public capital"),
         (:Tprog, "Tax progressivity"),
@@ -469,7 +486,7 @@ plot_hist_decomp(
         (:RB, "Nominal rate"),
         (:π, "Inflation"),
         (:σ, "Income risk"),
-        (:GI, "Gov. Investment"),
+        #(:GI, "Gov. Investment"),
         (:Sp, "Public capital in construction"),
         (:KG, "Finished public capital"),
         (:Tprog, "Tax progressivity"),
@@ -482,7 +499,7 @@ plot_hist_decomp(
     shock_categories = Dict(
         ("Monetary", "mon") => [:Rshock, :A],
         ("Fiscal", "fis") => [:Gshock, :Tprogshock, :GI],
-        ("Productivity", "pro") => [:Z, :TFP, :ZI, :μ, :μw],
+        ("Productivity", "pro") => [:TFP, :ZI, :μ, :μw],
     ),
     timeline = collect(1954.75:0.25:2019.75), #adjust
     show_fig = false,

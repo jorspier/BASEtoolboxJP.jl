@@ -310,9 +310,9 @@ F[indexes.KG] = (log(KGPrime)) - (log((1.0 - m_par.δ_KG) * KG + m_par.ϕ_GI * S
 F[indexes.TFP] = (log(TFPPrime)) - (m_par.ρ_TFP * log(TFP))
 
 # Effective TFP
-F[indexes.Z] = (log(ZPrime)) - 
-    (log(TFPPrime) + 
-     m_par.η_KG * (log(KGPrime) - XSS[indexes.KGSS]) # Prime to not have additional period lag
+F[indexes.Z] = (log(Z)) - 
+    (log(TFP) + 
+     m_par.η_KG * (log(KG) - XSS[indexes.KGSS])
     )
 
 ## Asset markets --------------------------------------------------------------------------

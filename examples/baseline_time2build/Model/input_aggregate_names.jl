@@ -13,7 +13,7 @@ shock_names = [:ZI, :μ, :μw, :A, :Rshock, :Gshock, :Tprogshock, :Sshock, :TFP,
 # Duplicated names are created below
 state_names = [
     "A",
-    "Z",
+    #"Z",
     "ZI",
     "RB",
     "μ",
@@ -100,6 +100,7 @@ control_names = [
     "Π_E",
     "TotalAssets",
     "τprog",
+    "Z"
 ]
 
 # List of (the subset) of aggregate states, that need to be duplicated (e.g. across countries or industries)

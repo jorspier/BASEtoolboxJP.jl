@@ -172,7 +172,8 @@ F[indexes.GIshock] = (log(GIshockPrime)) - (m_par.ρ_GIshock * log(GIshock))
 # Law of Motion for Government Investment
 F[indexes.GI] = (log(GIPrime)) - 
     (m_par.ρ_GI * log(GI) +
-    (1 - m_par.ρ_GI) * XSS[indexes.GISS]
+    (1 - m_par.ρ_GI) * XSS[indexes.GISS] +
+    log(GIshock)
     )
 
 # Tax shock

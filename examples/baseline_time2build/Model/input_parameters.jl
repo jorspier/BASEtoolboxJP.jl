@@ -600,8 +600,7 @@ in the fields `mode_start_file`, `data_file`, `save_mode_file` and `save_posteri
             :TOP10Wshare,
             :TOP10Ishare,
             :τprog,
-            :σ,
-            :GI
+            :σ
         ]
 
     nobservables = length(observed_vars_input)
