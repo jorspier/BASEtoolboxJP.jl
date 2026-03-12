@@ -173,14 +173,14 @@ stds = [getfield(sr_full.m_par, Symbol("σ_", i)) for i in shock_names];
 transform_elements =
     transformation_elements(sr_full, sr_full.n_par.model, sr_full.n_par.distribution_states); # Γ, DC, IDC, DCD, IDCD
 
-IRFs, _, IRFs_order = compute_irfs( # removed , IRFs_dist
+IRFs, _, IRFs_order, IRFs_dist = compute_irfs( 
     exovars,
     lr_full.State2Control,
     lr_full.LOMstate,
     sr_full.XSS,
     sr_full.indexes;
     init_val = stds,
-    distribution = false,
+    distribution = true,
     comp_ids = sr_full.compressionIndexes,
     transform_elements = transform_elements,
     n_par = sr_full.n_par,
@@ -201,6 +201,7 @@ VDbcs, UnconditionalVar =
 @printf "\n"
 @printf "Plotting...\n"
 
+# IRFs
 mkpath(paths["bld_example"] * "/IRFs");
 plot_irfs(
     [
@@ -271,6 +272,7 @@ plot_irfs_cat(
     IRFs,
     IRFs_order,
     sr_full.indexes;
+    horizon = 80,
     show_fig = false,
     save_fig = true,
     path = paths["bld_example"] * "/IRFs_cat",
@@ -278,6 +280,7 @@ plot_irfs_cat(
     style_options = (lw = 2, color = [:blue, :red, :green, :orange], linestyle = [:solid, :dash, :dot]),
 );
 
+# Variance decomposition
 mkpath(paths["bld_example"] * "/VDs");
 plot_vardecomp(
     [
@@ -300,6 +303,7 @@ plot_vardecomp(
     [(VDs, "Baseline")],
     IRFs_order,
     sr_full.indexes;
+    #horizon = 80,
     show_fig = false,
     save_fig = true,
     path = paths["bld_example"] * "/VDs",
@@ -327,6 +331,7 @@ plot_vardecomp(
     [(VDs, "Baseline")],
     IRFs_order,
     sr_full.indexes;
+    #horizon = 80,
     shock_categories = Dict(
         ("Monetary", "mon") => [:Rshock, :A],
         ("Fiscal", "fis") => [:Gshock, :Tprogshock, :GI],
@@ -337,6 +342,7 @@ plot_vardecomp(
     path = paths["bld_example"] * "/VDs_cat",
 );
 
+# Business cycle frequency variance decomposition
 mkpath(paths["bld_example"] * "/VDbcs");
 plot_vardecomp_bcfreq(
     [
@@ -359,6 +365,7 @@ plot_vardecomp_bcfreq(
     [(VDbcs, "Baseline")],
     IRFs_order,
     sr_full.indexes;
+    #horizon = 80,
     show_fig = false,
     save_fig = true,
     path = paths["bld_example"] * "/VDbcs",
@@ -386,6 +393,7 @@ plot_vardecomp_bcfreq(
     [(VDbcs, "Baseline")],
     IRFs_order,
     sr_full.indexes;
+    #horizon = 80,
     shock_categories = Dict(
         ("Monetary", "mon") => [:Rshock, :A],
         ("Fiscal", "fis") => [:Gshock, :Tprogshock, :GI],
@@ -396,7 +404,7 @@ plot_vardecomp_bcfreq(
     path = paths["bld_example"] * "/VDbcs_cat",
 );
 
-#=
+# Distributional IRFs
 mkpath(paths["bld_example"] * "/IRFs_dist");
 plot_distributional_irfs(
     [
@@ -423,6 +431,7 @@ plot_distributional_irfs(
     IRFs_dist,
     IRFs_order,
     sr_full.n_par;
+    horizon = 80,
     bounds = Dict(
         "b" => (sr_full.n_par.grid_b[1], 100.0),
         "k" => (sr_full.n_par.grid_k[1], 100.0),
@@ -431,7 +440,27 @@ plot_distributional_irfs(
     save_fig = true,
     path = paths["bld_example"] * "/IRFs_dist",
 );
-=#
+
+mkpath(paths["bld_example"] * "/IRFs_dist_dev");
+plot_distributional_irfs_deviation(
+    [   (:GI, "Gov. Investment")
+        ],
+    [   ("PDF_b", "Bonds"), 
+        ("PDF_k", "Capital")
+        ],
+    IRFs_dist,
+    IRFs_order,
+    sr_full.n_par;
+    horizon = 80,
+    bounds = Dict(
+        "b" => (sr_full.n_par.grid_b[1], 100.0),
+        "k" => (sr_full.n_par.grid_k[1], 100.0),
+    ),
+    show_fig = false,
+    save_fig = true, 
+    path = paths["bld_example"] * "/IRFs_dist_dev"
+)
+
 
 @printf "\n"
 @printf "Done.\n"

@@ -80,7 +80,8 @@ export compute_irfs,
     plot_vardecomp_bcfreq,
     plot_distributional_irfs,
     plot_hist_decomp,
-    transformation_elements
+    transformation_elements,
+    plot_distributional_irfs_deviation
 
 # Functions passed through from 3rd Party packages
 export mode, metaflatten, prior, label, jldsave, @set!, @load

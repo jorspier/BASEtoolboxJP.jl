@@ -41,7 +41,7 @@ m_par = ModelParameters();
 @set! m_par.ξ = 4.0;
 @set! m_par.γ = 2.0;
 @set! m_par.β = 0.98255;
-@set! m_par.λ = 0.06692937984; # 0.065;
+@set! m_par.λ = 0.065;
 @set! m_par.ρ_h = 0.98;
 @set! m_par.σ_h = 0.12;
 @set! m_par.ι = 0.0625;
@@ -54,7 +54,7 @@ m_par = ModelParameters();
 @set! m_par.κ = 0.1456082664986374;
 @set! m_par.μw = 1.1;
 @set! m_par.κw = 0.23931075416274708;
-@set! m_par.Tlev = 1.1775; #1.0 + (1 - 0.8225);
+@set! m_par.Tlev = 1.0 + (1 - 0.8225);
 @set! m_par.Tprog = 1.0 + 0.1022;
 @set! m_par.Tc = 1.0;
 @set! m_par.Tk = 1.0;
@@ -79,7 +79,7 @@ m_par = ModelParameters();
 @set! m_par.ρ_R = 0.8030565250630299;
 @set! m_par.σ_Rshock = 0.002306627917745612;
 @set! m_par.θ_π = 2.0780841671981856;
-@set! m_par.θ_Y = 0.0; # 0.21872568927661648;
+@set! m_par.θ_Y = 0.21872568927661648;
 @set! m_par.γ_B = 0.020131162775595176;
 @set! m_par.γ_π = -2.1737350397931947;
 @set! m_par.γ_Y = -0.4363130165391906;
@@ -101,7 +101,7 @@ m_par = ModelParameters();
 @set! m_par.γ_GI = 1.0;                     # Deficit reaction to GI (0 = tax financed, 1 = debt)
 @set! m_par.GI_share = 0.03;                # Steady state share of govt investment
 @set! m_par.ϕ_GI = 1/4;                     # Pipeline efficiency (1/4 builds per quarter)
-@set! m_par.δ_KG = 0.015;                   # Depreciation of public capital
+@set! m_par.δ_KG = 0.01;                    # Depreciation of public capital (1% per quarter - 4% per year)
 @set! m_par.η_KG = 0.05;                    # Elasticity of output w.r.t public capital
 @set! m_par.ρ_GI = 0.90;                    # Persistence of GI shock
 @set! m_par.σ_GI = 0.01;                    # Std dev of GI shock
@@ -316,14 +316,14 @@ exovars = [getfield(sr_full.indexes, shock_names[i]) for i = 1:length(shock_name
 stds = [getfield(sr_full.m_par, Symbol("σ_", i)) for i in shock_names];
 
 # Compute IRFs
-IRFs, _, IRFs_order = compute_irfs( # , IRFs_dist
+IRFs, _, IRFs_order, IRFs_dist = compute_irfs(
     exovars,
     lr_full.State2Control,
     lr_full.LOMstate,
     sr_full.XSS,
     sr_full.indexes;
     init_val = stds,
-    distribution = false,
+    distribution = true,
     comp_ids = sr_full.compressionIndexes,
     n_par = sr_full.n_par,
 );

@@ -40,6 +40,7 @@ include("PostEstimation/compute_hist_decomp.jl")
 include("PostEstimation/plot_irfs.jl")
 include("PostEstimation/plot_irfs_cat.jl")
 include("PostEstimation/plot_distributional_irfs.jl")
+include("PostEstimation/plot_distributional_irfs_deviation.jl")
 include("PostEstimation/plot_vardecomp.jl")
 include("PostEstimation/plot_hist_decomp.jl")
 
@@ -55,6 +56,7 @@ export compute_irfs,
     plot_vardecomp,
     plot_vardecomp_bcfreq,
     plot_distributional_irfs,
+    plot_distributional_irfs_deviation,
     plot_hist_decomp,
     uncondFirstMoment_SO_analytical,
     GIRF_FO,
