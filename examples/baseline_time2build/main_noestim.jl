@@ -40,12 +40,12 @@ m_par = ModelParameters();
 
 @set! m_par.ξ = 4.0;
 @set! m_par.γ = 2.0;
-@set! m_par.β = 0.98255;
-@set! m_par.λ = 0.065;
+@set! m_par.β = 0.9828470527212994; # 0.98255;
+@set! m_par.λ = 0.06038247534019993; # 0.065;
 @set! m_par.ρ_h = 0.98;
 @set! m_par.σ_h = 0.12;
 @set! m_par.ι = 0.0625;
-@set! m_par.ζ = 0.00022222222222222223;
+@set! m_par.ζ = 0.000258606126756716; # 0.00022222222222222223;
 @set! m_par.α = 0.318;
 @set! m_par.δ_0 = 0.021500000000000002;
 @set! m_par.δ_s = 0.7055720197078786;
@@ -54,14 +54,14 @@ m_par = ModelParameters();
 @set! m_par.κ = 0.1456082664986374;
 @set! m_par.μw = 1.1;
 @set! m_par.κw = 0.23931075416274708;
-@set! m_par.Tlev = 1.0 + (1 - 0.8225);
+@set! m_par.Tlev = 1.2596633554411527; # 1.0 + (1 - 0.8225);
 @set! m_par.Tprog = 1.0 + 0.1022;
 @set! m_par.Tc = 1.0;
 @set! m_par.Tk = 1.0;
 @set! m_par.Ttr_1 = 1.0;
 @set! m_par.Ttr_2 = 1.0;
 @set! m_par.RRB = 1.0;
-@set! m_par.Rbar = 0.021778180864641117;
+@set! m_par.Rbar = 0.024276573587297953; # 0.021778180864641117;
 @set! m_par.ωΠ = 0.2;
 @set! m_par.ιΠ = 0.016;
 @set! m_par.shiftΠ = 0.7002848330469671;
@@ -96,17 +96,18 @@ m_par = ModelParameters();
 @set! m_par.ρ_Rshock = 1.0e-8;
 @set! m_par.ρ_Tprogshock = 1.0e-8;
 @set! m_par.ρ_Sshock = 1.0e-8;
+@set! m_par.ρ_TFP = 0.9978155269262137;     
+@set! m_par.σ_TFP = 0.00600947811158941; 
 
 # new govt investment parameters
 @set! m_par.γ_GI = 1.0;                     # Deficit reaction to GI (0 = tax financed, 1 = debt)
 @set! m_par.GI_share = 0.03;                # Steady state share of govt investment
-@set! m_par.ϕ_GI = 1/4;                     # Pipeline efficiency (1/4 builds per quarter)
-@set! m_par.δ_KG = 0.015;                   # Depreciation of public capital
+@set! m_par.ϕ_GI = 1/12;                    # Pipeline efficiency (1/4 builds per quarter)
+@set! m_par.δ_KG = 0.04;                    # Depreciation of public capital
 @set! m_par.η_KG = 0.05;                    # Elasticity of output w.r.t public capital
-@set! m_par.ρ_GI = 0.90;                    # Persistence of GI shock
-@set! m_par.σ_GI = 0.01;                    # Std dev of GI shock
-@set! m_par.ρ_TFP = 0.9978155269262137;     # Persistence of TFP shock
-@set! m_par.σ_TFP = 0.00600947811158941;    # Std dev of TFP shock
+@set! m_par.ρ_GI = 0.95;                    # Persistence of GI shock
+@set! m_par.σ_GI = m_par.σ_Gshock * (0.135 / m_par.GI_share) # Scaled to match consumption shock
+   
 
 
 ## ------------------------------------------------------------------------------------------
@@ -201,43 +202,51 @@ VDbcs, UnconditionalVar =
 @printf "\n"
 @printf "Plotting...\n"
 
+# Define here once all variables and shocks to plot for all figures 
+horizon = 80; 
+
+shocks_to_plot = [
+    #(:Z, "Effective TFP"),
+    (:GI, "Gov. Investment"), 
+    #(:TFP, "TFP Shock"),
+    #(:ZI, "Inv.-spec. tech."),
+    #(:μ, "Price markup"),
+    #(:μw, "Wage markup"),
+    #(:A, "Risk premium"),
+    #(:Rshock, "Mon. policy"),
+    #(:Gshock, "Structural deficit"),
+    #(:Tprogshock, "Tax progr."),
+    #(:Sshock, "Income risk"),
+]
+
+vars_to_plot = [
+    (:Ygrowth, "Output growth"),
+    (:Cgrowth, "Consumption growth"),
+    (:Igrowth, "Investment growth"),
+    (:N, "Employment"),
+    (:wgrowth, "Wage growth"),
+    (:RB, "Nominal rate"),
+    (:π, "Inflation"),
+    (:σ, "Income risk"),
+    (:Tprog, "Tax progressivity"),
+    (:TOP10Wshare, "Top 10 wealth share"),
+    (:TOP10Ishare, "Top 10 inc. share"),
+    (:GiniW, "Wealth Gini"),
+    (:GiniC, "Consumption Gini"),
+    (:Bgov, "Gov. Debt"),
+    (:KG, "Public Capital"),    
+    (:K, "Private Capital") 
+];
+
 # IRFs
 mkpath(paths["bld_example"] * "/IRFs");
 plot_irfs(
-    [
-        #(:Z, "Effective TFP"),
-        (:GI, "Gov. Investment"), 
-        (:TFP, "TFP Shock"),
-        (:ZI, "Inv.-spec. tech."),
-        (:μ, "Price markup"),
-        (:μw, "Wage markup"),
-        (:A, "Risk premium"),
-        (:Rshock, "Mon. policy"),
-        (:Gshock, "Structural deficit"),
-        (:Tprogshock, "Tax progr."),
-        (:Sshock, "Income risk"),
-    ],
-    [
-        (:Ygrowth, "Output growth"),
-        (:Cgrowth, "Consumption growth"),
-        (:Igrowth, "Investment growth"),
-        (:N, "Employment"),
-        (:wgrowth, "Wage growth"),
-        (:RB, "Nominal rate"),
-        (:π, "Inflation"),
-        (:σ, "Income risk"),
-        (:Tprog, "Tax progressivity"),
-        (:TOP10Wshare, "Top 10 wealth share"),
-        (:TOP10Ishare, "Top 10 inc. share"),
-        (:Bgov, "Gov. Debt"),
-        (:KG, "Public Capital"),
-        #(:GI, "Gov. Investment"),    
-        (:K, "Private Capital")  
-    ],
+    shocks_to_plot,
+    vars_to_plot,
     [(IRFs, "Baseline")],
     IRFs_order,
     sr_full.indexes;
-    horizon = 80,
+    horizon,
     show_fig = false,
     save_fig = true,
     path = paths["bld_example"] * "/IRFs",
@@ -248,31 +257,15 @@ plot_irfs(
 mkpath(paths["bld_example"] * "/IRFs_cat");
 plot_irfs_cat(
     Dict(
-        ("Monetary", "mon") => [:Rshock, :A],
-        ("Fiscal", "fis") => [:Gshock, :Tprogshock, :GI],
-        ("Productivity", "pro") => [:TFP, :ZI, :μ, :μw],
+        #("Monetary", "mon") => [:Rshock, :A],
+        ("Fiscal", "fis") => [:Gshock, :GI], # :Tprogshock
+        #("Productivity", "pro") => [:TFP, :ZI, :μ, :μw],
     ),
-    [
-        (:Ygrowth, "Output growth"),
-        (:Cgrowth, "Consumption growth"),
-        (:Igrowth, "Investment growth"),
-        (:N, "Employment"),
-        (:wgrowth, "Wage growth"),
-        (:RB, "Nominal rate"),
-        (:π, "Inflation"),
-        (:σ, "Income risk"),
-        (:Tprog, "Tax progressivity"),
-        (:TOP10Wshare, "Top 10 wealth share"),
-        (:TOP10Ishare, "Top 10 inc. share"),
-        (:Bgov, "Gov. Debt"),
-        (:KG, "Public Capital"),
-        #(:GI, "Gov. Investment"),    
-        (:K, "Private Capital") 
-    ],
+    vars_to_plot,
     IRFs,
     IRFs_order,
     sr_full.indexes;
-    horizon = 80,
+    horizon,
     show_fig = false,
     save_fig = true,
     path = paths["bld_example"] * "/IRFs_cat",
@@ -283,27 +276,10 @@ plot_irfs_cat(
 # Variance decomposition
 mkpath(paths["bld_example"] * "/VDs");
 plot_vardecomp(
-    [
-        (:Ygrowth, "Output growth"),
-        (:Cgrowth, "Consumption growth"),
-        (:Igrowth, "Investment growth"),
-        (:N, "Employment"),
-        (:wgrowth, "Wage growth"),
-        (:RB, "Nominal rate"),
-        (:π, "Inflation"),
-        (:σ, "Income risk"),
-        (:Tprog, "Tax progressivity"),
-        (:TOP10Wshare, "Top 10 wealth share"),
-        (:TOP10Ishare, "Top 10 inc. share"),
-        (:Bgov, "Gov. Debt"),
-        (:KG, "Public Capital"),
-        #(:GI, "Gov. Investment"),    
-        (:K, "Private Capital") 
-    ],
+    vars_to_plot,
     [(VDs, "Baseline")],
     IRFs_order,
     sr_full.indexes;
-    #horizon = 80,
     show_fig = false,
     save_fig = true,
     path = paths["bld_example"] * "/VDs",
@@ -311,27 +287,10 @@ plot_vardecomp(
 
 mkpath(paths["bld_example"] * "/VDs_cat");
 plot_vardecomp(
-    [
-        (:Ygrowth, "Output growth"),
-        (:Cgrowth, "Consumption growth"),
-        (:Igrowth, "Investment growth"),
-        (:N, "Employment"),
-        (:wgrowth, "Wage growth"),
-        (:RB, "Nominal rate"),
-        (:π, "Inflation"),
-        (:σ, "Income risk"),
-        (:Tprog, "Tax progressivity"),
-        (:TOP10Wshare, "Top 10 wealth share"),
-        (:TOP10Ishare, "Top 10 inc. share"),
-        (:Bgov, "Gov. Debt"),
-        (:KG, "Public Capital"),
-        #(:GI, "Gov. Investment"),    
-        (:K, "Private Capital") 
-    ],
+    vars_to_plot,
     [(VDs, "Baseline")],
     IRFs_order,
     sr_full.indexes;
-    #horizon = 80,
     shock_categories = Dict(
         ("Monetary", "mon") => [:Rshock, :A],
         ("Fiscal", "fis") => [:Gshock, :Tprogshock, :GI],
@@ -345,27 +304,10 @@ plot_vardecomp(
 # Business cycle frequency variance decomposition
 mkpath(paths["bld_example"] * "/VDbcs");
 plot_vardecomp_bcfreq(
-    [
-        (:Ygrowth, "Output growth"),
-        (:Cgrowth, "Consumption growth"),
-        (:Igrowth, "Investment growth"),
-        (:N, "Employment"),
-        (:wgrowth, "Wage growth"),
-        (:RB, "Nominal rate"),
-        (:π, "Inflation"),
-        (:σ, "Income risk"),
-        (:Tprog, "Tax progressivity"),
-        (:TOP10Wshare, "Top 10 wealth share"),
-        (:TOP10Ishare, "Top 10 inc. share"),
-        (:Bgov, "Gov. Debt"),
-        (:KG, "Public Capital"),
-        #(:GI, "Gov. Investment"),    
-        (:K, "Private Capital") 
-    ],
+    vars_to_plot,
     [(VDbcs, "Baseline")],
     IRFs_order,
     sr_full.indexes;
-    #horizon = 80,
     show_fig = false,
     save_fig = true,
     path = paths["bld_example"] * "/VDbcs",
@@ -373,27 +315,10 @@ plot_vardecomp_bcfreq(
 
 mkpath(paths["bld_example"] * "/VDbcs_cat");
 plot_vardecomp_bcfreq(
-    [
-        (:Ygrowth, "Output growth"),
-        (:Cgrowth, "Consumption growth"),
-        (:Igrowth, "Investment growth"),
-        (:N, "Employment"),
-        (:wgrowth, "Wage growth"),
-        (:RB, "Nominal rate"),
-        (:π, "Inflation"),
-        (:σ, "Income risk"),
-        (:Tprog, "Tax progressivity"),
-        (:TOP10Wshare, "Top 10 wealth share"),
-        (:TOP10Ishare, "Top 10 inc. share"),
-        (:Bgov, "Gov. Debt"),
-        (:KG, "Public Capital"),
-        #(:GI, "Gov. Investment"),    
-        (:K, "Private Capital") 
-    ],
+    vars_to_plot,
     [(VDbcs, "Baseline")],
     IRFs_order,
     sr_full.indexes;
-    #horizon = 80,
     shock_categories = Dict(
         ("Monetary", "mon") => [:Rshock, :A],
         ("Fiscal", "fis") => [:Gshock, :Tprogshock, :GI],
@@ -405,33 +330,24 @@ plot_vardecomp_bcfreq(
 );
 
 # Distributional IRFs
+irfs_to_plot = [
+    ("Wb_b", "Marginal Value of Bonds, over Bonds"),
+    ("Wk_k", "Marginal Value of Capital, over Capital"),
+    ("PDF_b", "Marginal PDF of Bonds"),
+    ("PDF_k", "Marginal PDF of Capital"),
+    ("PDF_bk", "Marginal PDF of Bonds and Capital"),
+    ("PDF_bh", "Marginal PDF of Bonds and Human Capital"),
+    ("PDF_kh", "Marginal PDF of Capital and Human Capital"),
+]
+
 mkpath(paths["bld_example"] * "/IRFs_dist");
 plot_distributional_irfs(
-    [
-        (:TFP, "TFP Shock"),
-        (:GI, "Gov. Investment"),
-        (:ZI, "Inv.-spec. tech."),
-        (:μ, "Price markup"),
-        (:μw, "Wage markup"),
-        (:A, "Risk premium"),
-        (:Rshock, "Mon. policy"),
-        (:Gshock, "Structural deficit"),
-        (:Tprogshock, "Tax progr."),
-        (:Sshock, "Income risk"),
-    ],
-    [
-        ("Wb_b", "Marginal Value of Bonds, over Bonds"),
-        ("Wk_k", "Marginal Value of Capital, over Capital"),
-        ("PDF_b", "Marginal PDF of Bonds"),
-        ("PDF_k", "Marginal PDF of Capital"),
-        ("PDF_bk", "Marginal PDF of Bonds and Capital"),
-        ("PDF_bh", "Marginal PDF of Bonds and Human Capital"),
-        ("PDF_kh", "Marginal PDF of Capital and Human Capital"),
-    ],
+    shocks_to_plot,
+    irfs_to_plot,
     IRFs_dist,
     IRFs_order,
     sr_full.n_par;
-    horizon = 80,
+    horizon,
     bounds = Dict(
         "b" => (sr_full.n_par.grid_b[1], 100.0),
         "k" => (sr_full.n_par.grid_k[1], 100.0),
@@ -443,15 +359,12 @@ plot_distributional_irfs(
 
 mkpath(paths["bld_example"] * "/IRFs_dist_dev");
 plot_distributional_irfs_deviation(
-    [   (:GI, "Gov. Investment")
-        ],
-    [   ("PDF_b", "Bonds"), 
-        ("PDF_k", "Capital")
-        ],
+    shocks_to_plot,
+    irfs_to_plot,
     IRFs_dist,
     IRFs_order,
     sr_full.n_par;
-    horizon = 80,
+    horizon,
     bounds = Dict(
         "b" => (sr_full.n_par.grid_b[1], 100.0),
         "k" => (sr_full.n_par.grid_k[1], 100.0),

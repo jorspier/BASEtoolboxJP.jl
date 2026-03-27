@@ -52,6 +52,7 @@ StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
 VectorInterface = "409d34a3-91d5-4945-b6ec-7529ddf182d8"
 
 [compat]
-JuliaFormatter = "1" # VS Code is only compatible with this version
-PrettyTables = "2" # With v3, there is a breaking change that we need to fix
-ForwardDiff = "<1.0" # Without this, we run into issues with the eigenvalues
+ForwardDiff = "<1.0"
+JuliaFormatter = "1"
+Plots = "1.41.6"
+PrettyTables = "2"

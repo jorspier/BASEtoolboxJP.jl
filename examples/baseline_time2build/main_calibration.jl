@@ -40,12 +40,12 @@ m_par = ModelParameters();
 
 @set! m_par.ξ = 4.0;
 @set! m_par.γ = 2.0;
-@set! m_par.β = 0.98255;
-@set! m_par.λ = 0.065;
+@set! m_par.β = 0.98255; # new guess: 0.9828470527212994
+@set! m_par.λ = 0.065; # new guess: 0.06038247534019993
 @set! m_par.ρ_h = 0.98;
 @set! m_par.σ_h = 0.12;
 @set! m_par.ι = 0.0625;
-@set! m_par.ζ = 0.00022222222222222223;
+@set! m_par.ζ = 0.00022222222222222223; # new guess: 0.000258606126756716
 @set! m_par.α = 0.318;
 @set! m_par.δ_0 = 0.021500000000000002;
 @set! m_par.δ_s = 0.7055720197078786;
@@ -54,14 +54,14 @@ m_par = ModelParameters();
 @set! m_par.κ = 0.1456082664986374;
 @set! m_par.μw = 1.1;
 @set! m_par.κw = 0.23931075416274708;
-@set! m_par.Tlev = 1.0 + (1 - 0.8225);
+@set! m_par.Tlev = 1.0 + (1 - 0.8225); # new guess: 1.2596633554411527
 @set! m_par.Tprog = 1.0 + 0.1022;
 @set! m_par.Tc = 1.0;
 @set! m_par.Tk = 1.0;
 @set! m_par.Ttr_1 = 1.0;
 @set! m_par.Ttr_2 = 1.0;
 @set! m_par.RRB = 1.0;
-@set! m_par.Rbar = 0.021778180864641117;
+@set! m_par.Rbar = 0.021778180864641117; # new guess: 0.024276573587297953
 @set! m_par.ωΠ = 0.2;
 @set! m_par.ιΠ = 0.016;
 @set! m_par.shiftΠ = 0.7002848330469671;
@@ -96,6 +96,8 @@ m_par = ModelParameters();
 @set! m_par.ρ_Rshock = 1.0e-8;
 @set! m_par.ρ_Tprogshock = 1.0e-8;
 @set! m_par.ρ_Sshock = 1.0e-8;
+@set! m_par.ρ_TFP = 0.9978155269262137;     
+@set! m_par.σ_TFP = 0.00600947811158941;    
 
 # new govt investment parameters
 @set! m_par.γ_GI = 1.0;                     # Deficit reaction to GI (0 = tax financed, 1 = debt)
@@ -103,10 +105,9 @@ m_par = ModelParameters();
 @set! m_par.ϕ_GI = 1/4;                     # Pipeline efficiency (1/4 builds per quarter)
 @set! m_par.δ_KG = 0.01;                    # Depreciation of public capital (1% per quarter - 4% per year)
 @set! m_par.η_KG = 0.05;                    # Elasticity of output w.r.t public capital
-@set! m_par.ρ_GI = 0.90;                    # Persistence of GI shock
-@set! m_par.σ_GI = 0.01;                    # Std dev of GI shock
-@set! m_par.ρ_TFP = 0.9978155269262137;     # Persistence of TFP shock
-@set! m_par.σ_TFP = 0.00600947811158941;    # Std dev of TFP shock
+@set! m_par.ρ_GI = 0.95;                    # Persistence of GI shock
+@set! m_par.σ_GI = m_par.σ_Gshock * (0.135 / m_par.GI_share) # scale investment shock to same absolute size as consumption shock
+
 
 ## ------------------------------------------------------------------------------------------
 ## Preparing the calibration
@@ -200,11 +201,15 @@ using Optim;
 
 # For Nelder-Mead
 cal_dict = Dict(
-    "params_to_calibrate" => [:β, :λ, :Tlev, :ζ, :Rbar],
+    "params_to_calibrate" => [  :β,     # discount factor
+                                :λ,     # asset adjustement friction
+                                :Tlev,  # income tax level
+                                :ζ,     # prob. to become entrepreneur
+                                :Rbar], # borrowing wedge
     "target_moments" => Dict( # User-defined targets # these are from paper
         "K/Y" => 11.72 / 4,  # Capital-output ratio (11.22 US)
         "B/K" => 0.25,  # Liquid to illiquid ratio
-        "G/Y" => 0.22,  # Gov. spending-output ratio (0.22 GER)
+        "G/Y" => 0.135,  # Gov. spending-output ratio (0.22 GER)
         "T10W" => 0.67,  # Top 10% wealth share
         "Frac Borrowers" => 0.16,  # Fraction of borrowers
         # "GI/Y" => 0.03,  # Gov. investment to output ratio
@@ -316,6 +321,9 @@ exovars = [getfield(sr_full.indexes, shock_names[i]) for i = 1:length(shock_name
 stds = [getfield(sr_full.m_par, Symbol("σ_", i)) for i in shock_names];
 
 # Compute IRFs
+transform_elements =
+    transformation_elements(sr_full, sr_full.n_par.model, sr_full.n_par.distribution_states); # Γ, DC, IDC, DCD, IDCD
+
 IRFs, _, IRFs_order, IRFs_dist = compute_irfs(
     exovars,
     lr_full.State2Control,
@@ -325,7 +333,9 @@ IRFs, _, IRFs_order, IRFs_dist = compute_irfs(
     init_val = stds,
     distribution = true,
     comp_ids = sr_full.compressionIndexes,
+    transform_elements = transform_elements,
     n_par = sr_full.n_par,
+    m_par = sr_full.m_par,
 );
 
 # Compute variance decomposition of IRFs
@@ -345,39 +355,104 @@ VDbcs, UnconditionalVar =
 mkpath(paths["bld_example"] * "/IRFs");
 plot_irfs(
     [
-        (:ZI, "Inv.-spec. tech."),
-        (:μ, "Price markup"),
-        (:μw, "Wage markup"),
-        (:A, "Risk premium"),
-        (:Rshock, "Mon. policy"),
+        #(:ZI, "Inv.-spec. tech."),
+        #(:μ, "Price markup"),
+        #(:μw, "Wage markup"),
+        #(:A, "Risk premium"),
+        #(:Rshock, "Mon. policy"),
         (:Gshock, "Structural deficit"),
         (:GI, "Gov. Investment"),
-        (:Tprogshock, "Tax progr."),
-        (:Sshock, "Income risk"),
+        #(:Tprogshock, "Tax progr."),
+        #(:Sshock, "Income risk"),
     ],
     [
         (:Ygrowth, "Output growth"),
         (:Cgrowth, "Consumption growth"),
-        #(:GI, "Gov. Investment"),
         (:Igrowth, "Investment growth"),
+        (:Bgov, "Gov. Debt"),
+        (:KG, "Public Capital"),
         (:N, "Employment"),
         (:wgrowth, "Wage growth"),
         (:RB, "Nominal rate"),
         (:π, "Inflation"),
         (:σ, "Income risk"),
-        (:Tprog, "Tax progressivity"),
+        #(:Tprog, "Tax progressivity"),
         (:TOP10Wshare, "Top 10 wealth share"),
         (:TOP10Ishare, "Top 10 inc. share"),
+        (:GiniW, "Wealth Gini"),
+        (:GiniC, "Consumption Gini"),
     ],
     [(IRFs, "Baseline")],
     IRFs_order,
     sr_full.indexes;
+    horizon = 80,
     show_fig = false,
     save_fig = true,
     path = paths["bld_example"] * "/IRFs",
     yscale = "standard",
     style_options = (lw = 2, color = [:blue, :red], linestyle = [:solid, :dash]),
 );
+
+
+mkpath(paths["bld_example"] * "/IRFs_cat");
+plot_irfs_cat(
+    Dict(
+        #("Monetary", "mon") => [:Rshock, :A],
+        ("Fiscal", "fis") => [:Gshock, :GI],
+        #("Productivity", "pro") => [:TFP, :ZI, :μ, :μw],
+    ),
+    [
+        (:Ygrowth, "Output growth"),
+        (:Cgrowth, "Consumption growth"),
+        (:Igrowth, "Investment growth"),
+        (:Bgov, "Gov. Debt"),
+        (:KG, "Public Capital"),
+        (:N, "Employment"),
+        (:wgrowth, "Wage growth"),
+        (:RB, "Nominal rate"),
+        (:π, "Inflation"),
+        (:σ, "Income risk"),
+        #(:Tprog, "Tax progressivity"),
+        (:TOP10Wshare, "Top 10 wealth share"),
+        (:TOP10Ishare, "Top 10 inc. share"),
+        (:GiniW, "Wealth Gini"),
+        (:GiniC, "Consumption Gini"),
+    ],
+    IRFs,
+    IRFs_order,
+    sr_full.indexes;
+    horizon = 80,
+    show_fig = false,
+    save_fig = true,
+    path = paths["bld_example"] * "/IRFs_cat",
+    yscale = "standard",
+    style_options = (lw = 2, color = [:blue, :red, :green, :orange], linestyle = [:solid, :dash, :dot]),
+);
+
+mkpath(paths["bld_example"] * "/IRFs_dist_dev");
+plot_distributional_irfs_deviation(
+    [   (:GI, "Gov. Investment")
+        ],
+    [   ("Wb_b", "Marginal Value of Bonds, over Bonds"),
+        ("Wk_k", "Marginal Value of Capital, over Capital"),
+        ("PDF_b", "Marginal PDF of Bonds"),
+        ("PDF_k", "Marginal PDF of Capital"),
+        ("PDF_bk", "Marginal PDF of Bonds and Capital"),
+        ("PDF_bh", "Marginal PDF of Bonds and Human Capital"),
+        ("PDF_kh", "Marginal PDF of Capital and Human Capital")
+        ],
+    IRFs_dist,
+    IRFs_order,
+    sr_full.n_par;
+    horizon = 80,
+    bounds = Dict(
+        "b" => (sr_full.n_par.grid_b[1], 100.0),
+        "k" => (sr_full.n_par.grid_k[1], 100.0),
+    ),
+    show_fig = false,
+    save_fig = true, 
+    path = paths["bld_example"] * "/IRFs_dist_dev"
+)
 
 @printf "\n"
 @printf "Done.\n"
