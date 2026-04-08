@@ -45,8 +45,63 @@ ISS = m_par.δ_0 * KSS
 
 # government investment
 GISS = m_par.GI_share * YSS
-SpSS = GISS / m_par.ϕ_GI
-KGSS = (m_par.ϕ_GI * SpSS) / m_par.δ_KG
+# SpSS = GISS / m_par.ϕ_GI
+AuthSS = GISS
+KGSS = GISS / m_par.δ_KG
+
+# Lags for government investment and authorizations
+Auth_lag1SS = AuthSS
+Auth_lag2SS = AuthSS
+Auth_lag3SS = AuthSS
+Auth_lag4SS = AuthSS
+Auth_lag5SS = AuthSS
+Auth_lag6SS = AuthSS
+Auth_lag7SS = AuthSS
+Auth_lag8SS = AuthSS
+Auth_lag9SS = AuthSS
+Auth_lag10SS = AuthSS
+Auth_lag11SS = AuthSS
+Auth_lag12SS = AuthSS
+Auth_lag13SS = AuthSS
+Auth_lag14SS = AuthSS
+Auth_lag15SS = AuthSS
+Auth_lag16SS = AuthSS
+Auth_lag17SS = AuthSS
+Auth_lag18SS = AuthSS
+Auth_lag19SS = AuthSS
+Auth_lag20SS = AuthSS
+Auth_lag21SS = AuthSS
+Auth_lag22SS = AuthSS
+Auth_lag23SS = AuthSS
+Auth_lag24SS = AuthSS
+Auth_lag25SS = AuthSS
+Auth_lag26SS = AuthSS
+Auth_lag27SS = AuthSS
+Auth_lag28SS = AuthSS
+Auth_lag29SS = AuthSS
+Auth_lag30SS = AuthSS
+Auth_lag31SS = AuthSS
+Auth_lag32SS = AuthSS
+Auth_lag33SS = AuthSS
+Auth_lag34SS = AuthSS
+Auth_lag35SS = AuthSS
+Auth_lag36SS = AuthSS
+Auth_lag37SS = AuthSS
+Auth_lag38SS = AuthSS
+Auth_lag39SS = AuthSS
+
+GI_lag1SS = GISS
+GI_lag2SS = GISS
+GI_lag3SS = GISS
+GI_lag4SS = GISS
+GI_lag5SS = GISS
+GI_lag6SS = GISS
+GI_lag7SS = GISS
+GI_lag8SS = GISS
+GI_lag9SS = GISS
+GI_lag10SS = GISS
+GI_lag11SS = GISS
+GI_lag12SS = GISS
 
 # financial market
 LPSS = RKSS / (RBSS / πSS)

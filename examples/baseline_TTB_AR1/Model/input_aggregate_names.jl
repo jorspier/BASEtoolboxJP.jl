@@ -7,13 +7,13 @@
 n_rep = 1 # Number of n_rep of some model equations (e.g. countries, industries)
 
 # List of aggregate shocks, without duplication (e.g. across countries or industries)
-shock_names = [:Z, :ZI, :μ, :μw, :A, :Rshock, :Gshock, :Tprogshock, :Sshock, :Zshock, :GI] 
+shock_names = [:ZI, :μ, :μw, :A, :Rshock, :Gshock, :Tprogshock, :Sshock, :TFP, :GI] 
 
 # List of aggregate states, without duplication of names (e.g. across countries or industries)
 # Duplicated names are created below
 state_names = [
     "A",
-    "Z",
+    #"Z",
     "ZI",
     "RB",
     "μ",
@@ -33,8 +33,22 @@ state_names = [
     "Tprogshock",
     "Rshock",
     "Sshock",
-    "Zshock",
-    "GI"
+    "TFP",
+    "GI",
+    #"Sp",
+    "KG",
+    "GI_lag1",
+    "GI_lag2",
+    "GI_lag3",
+    "GI_lag4",
+    "GI_lag5",
+    "GI_lag6",
+    "GI_lag7",
+    "GI_lag8",
+    "GI_lag9",
+    "GI_lag10",
+    "GI_lag11",
+    "GI_lag12"
 ]
 
 # List of (the subset) of aggregate states, that need to be duplicated (e.g. across countries or industries)
@@ -98,6 +112,7 @@ control_names = [
     "Π_E",
     "TotalAssets",
     "τprog",
+    "Z"
 ]
 
 # List of (the subset) of aggregate states, that need to be duplicated (e.g. across countries or industries)

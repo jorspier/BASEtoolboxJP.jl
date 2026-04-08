@@ -92,11 +92,12 @@ function plot_irfs(
     # General stylistic choices for the plots
     pp_layout = (
         dpi = 300,
-        size = (1600, 1000),
+        size = (1800, 1000),
         foreground_color_legend = nothing,
         background_color_legend = nothing,
-        tickfont = font(10, "Computer Modern"),
-        titlefont = font(12, "Computer Modern"),
+        tickfont = font(14, "Computer Modern"),
+        titlefont = font(16, "Computer Modern"),
+        legendfont = font(12, "Computer Modern"),
         lw = style_options.lw,
     )
 
@@ -170,8 +171,8 @@ function plot_irfs(
         end
 
         # Extract the variables to plot and their labels
-        i_vars = [i_shock, vars...]
-        i_labs = [i_shock_lab, labs...]
+        i_vars = [vars...]
+        i_labs = [labs...]
 
         # Determine y-axis limits for "common" yscale or user-defined tuple
         if yscale == "common"

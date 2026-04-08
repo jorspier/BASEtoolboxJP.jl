@@ -13,7 +13,7 @@ RshockSS = 1.0
 GshockSS = 1.0
 TprogshockSS = 1.0
 SshockSS = 1.0
-ZshockSS = 1.0
+TFPSS = 1.0
 
 ## Growth rates
 YgrowthSS = 1.0
@@ -40,9 +40,27 @@ RDSS = RRDSS .* πSS
 # production side
 wFSS = wage(mcSS, ZSS, KSS, NSS, m_par)
 YSS = output(ZSS, KSS, NSS, m_par)
-GISS = m_par.GI_share * YSS
 ISS = m_par.δ_0 * KSS
 Π_FSS = (1.0 - mcSS) .* YSS
+
+# government investment
+GISS = m_par.GI_share * YSS
+# SpSS = GISS / m_par.ϕ_GI
+KGSS = GISS / m_par.δ_KG
+
+# Constructino lags
+GI_lag1SS = GISS
+GI_lag2SS = GISS
+GI_lag3SS = GISS
+GI_lag4SS = GISS
+#GI_lag5SS = GISS
+#GI_lag6SS = GISS
+#GI_lag7SS = GISS
+#GI_lag8SS = GISS
+#GI_lag9SS = GISS
+#GI_lag10SS = GISS
+#GI_lag11SS = GISS
+#GI_lag12SS = GISS
 
 # financial market
 LPSS = RKSS / (RBSS / πSS)

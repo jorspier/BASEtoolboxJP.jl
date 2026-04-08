@@ -3,7 +3,7 @@ Mainboard for the baseline example of the BASEforHANK package, no estimation.
 """
 global_start_time = time()
 
-using PrettyTables, Printf;
+using PrettyTables, Printf, JLD2;
 
 ## ------------------------------------------------------------------------------------------
 ## Header: set up paths, pre-process user inputs, load module
@@ -102,11 +102,11 @@ m_par = ModelParameters();
 # new govt investment parameters
 @set! m_par.γ_GI = 1.0;                     # Deficit reaction to GI (0 = tax financed, 1 = debt)
 @set! m_par.GI_share = 0.03;                # Steady state share of govt investment
-@set! m_par.ϕ_GI = 1/12;                    # Pipeline efficiency (1/4 builds per quarter)
+# @set! m_par.ϕ_GI = 1/40;                    # Pipeline efficiency (1/4 builds per quarter)
 @set! m_par.δ_KG = 0.04;                    # Depreciation of public capital
-@set! m_par.η_KG = 0.05;                    # Elasticity of output w.r.t public capital
-@set! m_par.ρ_GI = 0.95;                    # Persistence of GI shock
-@set! m_par.σ_GI = m_par.σ_Gshock * (0.135 / m_par.GI_share) # Scaled to match consumption shock
+@set! m_par.η_KG = 0.15;                    # Elasticity of output w.r.t public capital
+@set! m_par.ρ_GI = 1.0e-8;                  # Spending is announced once; persistence originates from TTB
+@set! m_par.σ_Auth = m_par.σ_Gshock * (1.0 / (1.0 - m_par.ρ_Gshock)) * (0.17 / m_par.GI_share) # Scaled to match consumption shock
    
 
 
@@ -131,7 +131,7 @@ fr_borr = BASEforHANK.eval_cdf(sr_full.distrSS, :b, sr_full.n_par, 0.0);
 # new 
 GI = exp.(sr_full.XSS[sr_full.indexes.GISS]);
 KG = exp.(sr_full.XSS[sr_full.indexes.KGSS]);
-Sp = exp.(sr_full.XSS[sr_full.indexes.SpSS]);
+#Sp = exp.(sr_full.XSS[sr_full.indexes.SpSS]);
 
 # Display steady state moments
 @printf "\n"
@@ -174,19 +174,31 @@ stds = [getfield(sr_full.m_par, Symbol("σ_", i)) for i in shock_names];
 transform_elements =
     transformation_elements(sr_full, sr_full.n_par.model, sr_full.n_par.distribution_states); # Γ, DC, IDC, DCD, IDCD
 
-IRFs, _, IRFs_order, IRFs_dist = compute_irfs( 
+
+correct_init_vals = [sr_full.m_par.σ_Gshock, sr_full.m_par.σ_Auth]
+    
+IRFs, _, IRFs_order = compute_irfs( # IRFs_dist
     exovars,
     lr_full.State2Control,
     lr_full.LOMstate,
     sr_full.XSS,
     sr_full.indexes;
     init_val = stds,
-    distribution = true,
+    distribution = false,
     comp_ids = sr_full.compressionIndexes,
     transform_elements = transform_elements,
     n_par = sr_full.n_par,
     m_par = sr_full.m_par,
 );
+
+# export IRFs
+idx_dict_10Y = Dict{Symbol, Int}(
+    name => getfield(sr_full.indexes, name) 
+    for name in fieldnames(typeof(sr_full.indexes)) 
+    if getfield(sr_full.indexes, name) isa Int
+)
+
+@save joinpath(paths["bld"], "baseline_TTB_10Y_noestim", "IRFs_10Y.jld2") IRFs IRFs_order idx_dict_10Y
 
 # Compute variance decomposition of IRFs
 VDs = compute_vardecomp(IRFs);
@@ -205,6 +217,8 @@ VDbcs, UnconditionalVar =
 # Define here once all variables and shocks to plot for all figures 
 horizon = 80; 
 
+IRFs_order[IRFs_order .== :Auth] .= :GI
+
 shocks_to_plot = [
     #(:Z, "Effective TFP"),
     (:GI, "Gov. Investment"), 
@@ -214,28 +228,29 @@ shocks_to_plot = [
     #(:μw, "Wage markup"),
     #(:A, "Risk premium"),
     #(:Rshock, "Mon. policy"),
-    #(:Gshock, "Structural deficit"),
+    (:Gshock, "Structural deficit"),
     #(:Tprogshock, "Tax progr."),
     #(:Sshock, "Income risk"),
 ]
 
 vars_to_plot = [
-    (:Ygrowth, "Output growth"),
-    (:Cgrowth, "Consumption growth"),
-    (:Igrowth, "Investment growth"),
-    (:N, "Employment"),
-    (:wgrowth, "Wage growth"),
-    (:RB, "Nominal rate"),
-    (:π, "Inflation"),
-    (:σ, "Income risk"),
-    (:Tprog, "Tax progressivity"),
-    (:TOP10Wshare, "Top 10 wealth share"),
-    (:TOP10Ishare, "Top 10 inc. share"),
-    (:GiniW, "Wealth Gini"),
-    (:GiniC, "Consumption Gini"),
+    (:Y, "Output"), # removed growth
+    (:C, "Consumption"),
     (:Bgov, "Gov. Debt"),
     (:KG, "Public Capital"),    
-    (:K, "Private Capital") 
+    (:K, "Private Capital"),
+    (:I, "Investment"),
+    (:N, "Employment"),
+    (:wF, "Wage"),
+    (:π, "Inflation"),
+    (:RB, "Nominal rate"),
+    #(:σ, "Income risk"),
+    #(:Tprog, "Tax progressivity"),
+    #(:TOP10Wshare, "Top 10 wealth share"),
+    #(:TOP10Ishare, "Top 10 gross inc. share"),
+    #(:TOP10Inetshare, "Top 10 net inc. share"),
+    (:GiniW, "Wealth Gini"),
+    (:GiniC, "Consumption Gini") 
 ];
 
 # IRFs
@@ -247,6 +262,7 @@ plot_irfs(
     IRFs_order,
     sr_full.indexes;
     horizon,
+    save_fig_indiv = false,
     show_fig = false,
     save_fig = true,
     path = paths["bld_example"] * "/IRFs",
@@ -273,6 +289,7 @@ plot_irfs_cat(
     style_options = (lw = 2, color = [:blue, :red, :green, :orange], linestyle = [:solid, :dash, :dot]),
 );
 
+#=
 # Variance decomposition
 mkpath(paths["bld_example"] * "/VDs");
 plot_vardecomp(
@@ -373,7 +390,7 @@ plot_distributional_irfs_deviation(
     save_fig = true, 
     path = paths["bld_example"] * "/IRFs_dist_dev"
 )
-
+=#
 
 @printf "\n"
 @printf "Done.\n"

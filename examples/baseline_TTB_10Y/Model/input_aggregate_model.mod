@@ -95,7 +95,7 @@ F[indexes.π] =
         m_par.γ_Y * log(YREACTION) +
         m_par.γ_π * log(π) +
         log(Gshock) +
-        m_par.γ_GI * (log(GI) - XSS[indexes.GISS]) # new govt investment shock term
+        (m_par.γ_GI * exp(XSS[indexes.GISS] - XSS[indexes.BgovSS])) * (log(GI) - XSS[indexes.GISS])
     ) 
 
 # Average tax rate, see equation 34 in BBL (here simplified)
@@ -163,21 +163,11 @@ F[indexes.TR] =
     (log(TR)) - (log(transfer_scheme(n_par, m_par, args_hh_prob; distr_h = distr_h)))
 # This variable needs to be set for the package!
 
-# Primary deficit shock
-F[indexes.Gshock] = (log(GshockPrime)) - (m_par.ρ_Gshock * log(Gshock))
-
-# Investment shock Law of Motion (ensures that shock is not one period spike)
-F[indexes.GIshock] = (log(GIshockPrime)) - (m_par.ρ_GIshock * log(GIshock))
-
-# Law of Motion for Government Investment
-F[indexes.GI] = (log(GIPrime)) - 
-    (m_par.ρ_GI * log(GI) +
-    (1 - m_par.ρ_GI) * XSS[indexes.GISS] +
-    log(GIshock)
-    )
-
 # Tax shock
 F[indexes.Tprogshock] = (log(TprogshockPrime)) - (m_par.ρ_Tprogshock * log(Tprogshock))
+
+# Primary deficit shock (only consumption)
+F[indexes.Gshock] = (log(GshockPrime)) - (m_par.ρ_Gshock * log(Gshock))
 
 ## Monetary policy ------------------------------------------------------------------------
 
@@ -298,21 +288,101 @@ F[indexes.I] =
 # Production function
 F[indexes.Y] = (log(Y)) - (log(output(Z, Kserv, N, m_par)))
 
-# TFP
-F[indexes.Z] = (log(ZPrime)) - 
-    (m_par.ρ_Z * log(Z) + 
-    m_par.η_GI * (log(GI) - XSS[indexes.GISS]) + # new govt investment shock
-    log(Zshock) #added TFP shock term to have TFP fluctautions without investments
-    )
-
-# Law of motion for the TFP shock
-F[indexes.Zshock] = (log(ZshockPrime)) - (m_par.ρ_Zshock * log(Zshock))
+# Capital utilisation: optimality condition for utilization
+F[indexes.u] = (log(MPKserv)) - (log(q * (δ_1 + δ_2 * (u - 1.0))))
 
 # Investment-good productivity
 F[indexes.ZI] = (log(ZIPrime)) - (m_par.ρ_ZI * log(ZI))
 
-# Capital utilisation: optimality condition for utilization
-F[indexes.u] = (log(MPKserv)) - (log(q * (δ_1 + δ_2 * (u - 1.0))))
+## Government investment ---------------------------------------------------------------------
+
+# Investment shock Law of Motion (set to zero for single period announcement)
+#F[indexes.GI] = (log(GIPrime)) - (m_par.ρ_GI * log(GI) + 
+#    (1.0 - m_par.ρ_GI) * XSS[indexes.GISS])
+
+# Pipeline (stock) of public capital
+# F[indexes.Sp] = (log(SpPrime)) - (log((1.0 - m_par.ϕ_GI) * Sp + GI))
+
+# Spending the authotized investment linearly over 40 periods
+F[indexes.Auth] = (log(AuthPrime)) - 
+    (m_par.ρ_GI * log(Auth) + (1.0 - m_par.ρ_GI) * XSS[indexes.AuthSS])
+F[indexes.Auth_lag1] = (log(Auth_lag1Prime)) - (log(Auth))
+F[indexes.Auth_lag2] = (log(Auth_lag2Prime)) - (log(Auth_lag1))
+F[indexes.Auth_lag3] = (log(Auth_lag3Prime)) - (log(Auth_lag2))
+F[indexes.Auth_lag4] = (log(Auth_lag4Prime)) - (log(Auth_lag3))
+F[indexes.Auth_lag5] = (log(Auth_lag5Prime)) - (log(Auth_lag4))
+F[indexes.Auth_lag6] = (log(Auth_lag6Prime)) - (log(Auth_lag5))
+F[indexes.Auth_lag7] = (log(Auth_lag7Prime)) - (log(Auth_lag6))
+F[indexes.Auth_lag8] = (log(Auth_lag8Prime)) - (log(Auth_lag7))
+F[indexes.Auth_lag9] = (log(Auth_lag9Prime)) - (log(Auth_lag8))
+F[indexes.Auth_lag10] = (log(Auth_lag10Prime)) - (log(Auth_lag9))
+F[indexes.Auth_lag11] = (log(Auth_lag11Prime)) - (log(Auth_lag10))
+F[indexes.Auth_lag12] = (log(Auth_lag12Prime)) - (log(Auth_lag11))
+F[indexes.Auth_lag13] = (log(Auth_lag13Prime)) - (log(Auth_lag12))
+F[indexes.Auth_lag14] = (log(Auth_lag14Prime)) - (log(Auth_lag13))
+F[indexes.Auth_lag15] = (log(Auth_lag15Prime)) - (log(Auth_lag14))
+F[indexes.Auth_lag16] = (log(Auth_lag16Prime)) - (log(Auth_lag15))
+F[indexes.Auth_lag17] = (log(Auth_lag17Prime)) - (log(Auth_lag16))
+F[indexes.Auth_lag18] = (log(Auth_lag18Prime)) - (log(Auth_lag17))
+F[indexes.Auth_lag19] = (log(Auth_lag19Prime)) - (log(Auth_lag18))
+F[indexes.Auth_lag20] = (log(Auth_lag20Prime)) - (log(Auth_lag19))
+F[indexes.Auth_lag21] = (log(Auth_lag21Prime)) - (log(Auth_lag20))
+F[indexes.Auth_lag22] = (log(Auth_lag22Prime)) - (log(Auth_lag21))
+F[indexes.Auth_lag23] = (log(Auth_lag23Prime)) - (log(Auth_lag22))
+F[indexes.Auth_lag24] = (log(Auth_lag24Prime)) - (log(Auth_lag23))
+F[indexes.Auth_lag25] = (log(Auth_lag25Prime)) - (log(Auth_lag24))
+F[indexes.Auth_lag26] = (log(Auth_lag26Prime)) - (log(Auth_lag25))
+F[indexes.Auth_lag27] = (log(Auth_lag27Prime)) - (log(Auth_lag26))
+F[indexes.Auth_lag28] = (log(Auth_lag28Prime)) - (log(Auth_lag27))
+F[indexes.Auth_lag29] = (log(Auth_lag29Prime)) - (log(Auth_lag28))
+F[indexes.Auth_lag30] = (log(Auth_lag30Prime)) - (log(Auth_lag29))
+F[indexes.Auth_lag31] = (log(Auth_lag31Prime)) - (log(Auth_lag30))
+F[indexes.Auth_lag32] = (log(Auth_lag32Prime)) - (log(Auth_lag31))
+F[indexes.Auth_lag33] = (log(Auth_lag33Prime)) - (log(Auth_lag32))
+F[indexes.Auth_lag34] = (log(Auth_lag34Prime)) - (log(Auth_lag33))
+F[indexes.Auth_lag35] = (log(Auth_lag35Prime)) - (log(Auth_lag34))
+F[indexes.Auth_lag36] = (log(Auth_lag36Prime)) - (log(Auth_lag35))
+F[indexes.Auth_lag37] = (log(Auth_lag37Prime)) - (log(Auth_lag36))
+F[indexes.Auth_lag38] = (log(Auth_lag38Prime)) - (log(Auth_lag37))
+F[indexes.Auth_lag39] = (log(Auth_lag39Prime)) - (log(Auth_lag38))
+
+# Construction pipeline of public capital
+F[indexes.GI_lag1] = (log(GI_lag1Prime)) - (log(GI))
+F[indexes.GI_lag2] = (log(GI_lag2Prime)) - (log(GI_lag1))
+F[indexes.GI_lag3] = (log(GI_lag3Prime)) - (log(GI_lag2))
+F[indexes.GI_lag4] = (log(GI_lag4Prime)) - (log(GI_lag3))
+#F[indexes.GI_lag5] = (log(GI_lag5Prime)) - (log(GI_lag4))
+#F[indexes.GI_lag6] = (log(GI_lag6Prime)) - (log(GI_lag5))
+#F[indexes.GI_lag7] = (log(GI_lag7Prime)) - (log(GI_lag6))
+#F[indexes.GI_lag8] = (log(GI_lag8Prime)) - (log(GI_lag7))
+#F[indexes.GI_lag9] = (log(GI_lag9Prime)) - (log(GI_lag8))
+#F[indexes.GI_lag10] = (log(GI_lag10Prime)) - (log(GI_lag9))
+#F[indexes.GI_lag11] = (log(GI_lag11Prime)) - (log(GI_lag10))
+#F[indexes.GI_lag12] = (log(GI_lag12Prime)) - (log(GI_lag11))
+
+# Linear Spending Equation
+F[indexes.GI] = (log(GI)) - (log((1/40) * 
+    (Auth + Auth_lag1 + Auth_lag2 + Auth_lag3 + Auth_lag4 + 
+    Auth_lag5 + Auth_lag6 + Auth_lag7 + Auth_lag8 + Auth_lag9 + 
+    Auth_lag10 + Auth_lag11 + Auth_lag12 + Auth_lag13 + Auth_lag14 + 
+    Auth_lag15 + Auth_lag16 + Auth_lag17 + Auth_lag18 + Auth_lag19 + 
+    Auth_lag20 + Auth_lag21 + Auth_lag22 + Auth_lag23 + Auth_lag24 + 
+    Auth_lag25 + Auth_lag26 + Auth_lag27 + Auth_lag28 + Auth_lag29 + 
+    Auth_lag30 + Auth_lag31 + Auth_lag32 + Auth_lag33 + Auth_lag34 + 
+    Auth_lag35 + Auth_lag36 + Auth_lag37 + Auth_lag38 + Auth_lag39)))
+
+
+# Finished public capital
+F[indexes.KG] = (log(KGPrime)) - (log((1.0 - m_par.δ_KG) * KG + GI_lag4))
+
+# Law of motion for the TFP shock
+F[indexes.TFP] = (log(TFPPrime)) - (m_par.ρ_TFP * log(TFP))
+
+# Effective TFP
+F[indexes.Z] = (log(Z)) - 
+    (log(TFP) + 
+     m_par.η_KG * (log(KG) - XSS[indexes.KGSS])
+    )
 
 ## Asset markets --------------------------------------------------------------------------
 
