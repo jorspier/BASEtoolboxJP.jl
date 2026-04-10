@@ -22,6 +22,7 @@ IgrowthSS = 1.0
 wgrowthSS = 1.0
 CgrowthSS = 1.0
 TgrowthSS = 1.0
+GIgrowthSS = 1.0
 
 ## Further assumptions (partly also used in args_hh_prob)
 mcSS = 1.0 ./ μSS

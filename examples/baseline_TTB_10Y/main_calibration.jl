@@ -102,11 +102,11 @@ m_par = ModelParameters();
 # new govt investment parameters
 @set! m_par.γ_GI = 1.0;                     # Deficit reaction to GI (0 = tax financed, 1 = debt)
 @set! m_par.GI_share = 0.03;                # Steady state share of govt investment
-@set! m_par.ϕ_GI = 1/4;                     # Pipeline efficiency (1/4 builds per quarter)
+# @set! m_par.ϕ_GI = 1/4;                     # Pipeline efficiency (1/4 builds per quarter)
 @set! m_par.δ_KG = 0.01;                    # Depreciation of public capital (1% per quarter - 4% per year)
-@set! m_par.η_KG = 0.05;                    # Elasticity of output w.r.t public capital
-@set! m_par.ρ_GI = 0.95;                    # Persistence of GI shock
-@set! m_par.σ_GI = m_par.σ_Gshock * (0.135 / m_par.GI_share) # scale investment shock to same absolute size as consumption shock
+@set! m_par.η_KG = 0.1;                    # Elasticity of output w.r.t public capital
+@set! m_par.ρ_Auth = 0.95;                    # Persistence of GI shock
+@set! m_par.σ_Auth = m_par.σ_Gshock * (0.19 / m_par.GI_share) # scale investment shock to same absolute size as consumption shock
 
 
 ## ------------------------------------------------------------------------------------------
@@ -209,7 +209,7 @@ cal_dict = Dict(
     "target_moments" => Dict( # User-defined targets # these are from paper
         "K/Y" => 11.72 / 4,  # Capital-output ratio (11.22 US)
         "B/K" => 0.25,  # Liquid to illiquid ratio
-        "G/Y" => 0.135,  # Gov. spending-output ratio (0.22 GER)
+        "G/Y" => 0.19,  # Gov. spending-output ratio (0.22 GER)
         "T10W" => 0.67,  # Top 10% wealth share
         "Frac Borrowers" => 0.16,  # Fraction of borrowers
         # "GI/Y" => 0.03,  # Gov. investment to output ratio

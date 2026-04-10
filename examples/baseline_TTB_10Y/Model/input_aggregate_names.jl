@@ -146,6 +146,7 @@ control_names = [
     "wgrowth",
     "Cgrowth",
     "Tgrowth",
+    "GIgrowth",
     "LP",
     "LPXA",
     "Π_U",

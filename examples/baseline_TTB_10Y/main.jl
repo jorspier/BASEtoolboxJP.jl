@@ -106,23 +106,23 @@ jldsave(paths["bld_example"] * "/linearresults.jld2", true; lr_full);
 sr_reduc = model_reduction(sr_full, lr_full, m_par);
 lr_reduc = update_model(sr_reduc, lr_full, m_par);
 
-# Eigenvalue diagnostics
-using LinearAlgebra
-eigenvals = eigvals(n_par.nstates_r)
-eigenvals_sorted = sort(abs.(eigenvals), rev=true)
+# # Eigenvalue diagnostics
+# using LinearAlgebra
+# eigenvals = eigvals(n_par.nstates_r)
+# eigenvals_sorted = sort(abs.(eigenvals), rev=true)
 
-@printf "\n=== State Space Check ===\n"
-@printf "Number of states: %d (expected: 267)\n" size(n_par.nstates_r, 1)
+# @printf "\n=== State Space Check ===\n"
+# @printf "Number of states: %d (expected: 267)\n" size(n_par.nstates_r, 1)
 
-@printf "\nTop 15 eigenvalues:\n"
-for i in 1:min(15, length(eigenvals_sorted))
-    @printf "  %2d: %.10f" i eigenvals_sorted[i]
-    if i < length(eigenvals_sorted) && abs(eigenvals_sorted[i] - eigenvals_sorted[i+1]) < 1e-8
-        @printf "  ← DUPLICATE"
-    end
-    @printf "\n"
-end
-@printf "\n"
+# @printf "\nTop 15 eigenvalues:\n"
+# for i in 1:min(15, length(eigenvals_sorted))
+#     @printf "  %2d: %.10f" i eigenvals_sorted[i]
+#     if i < length(eigenvals_sorted) && abs(eigenvals_sorted[i] - eigenvals_sorted[i+1]) < 1e-8
+#         @printf "  ← DUPLICATE"
+#     end
+#     @printf "\n"
+# end
+# @printf "\n"
 
 # save the reduction
 jldsave(paths["bld_example"] * "/reduction.jld2", true; sr_reduc, lr_reduc);

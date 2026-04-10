@@ -85,6 +85,7 @@ F[indexes.Bgovgrowth] = (log(Bgovgrowth)) - (log(Bgov / Bgovlag))
 F[indexes.Igrowth] = (log(Igrowth)) - (log(I / Ilag))
 F[indexes.wgrowth] = (log(wgrowth)) - (log(wF / wFlag))
 F[indexes.Cgrowth] = (log(Cgrowth)) - (log(C / Clag))
+F[indexes.GIgrowth] = (log(GIgrowth)) - (log(GI / GI_lag1))
 
 ## Fiscal policy --------------------------------------------------------------------------
 
@@ -303,7 +304,7 @@ F[indexes.ZI] = (log(ZIPrime)) - (m_par.ρ_ZI * log(ZI))
 # Pipeline (stock) of public capital
 # F[indexes.Sp] = (log(SpPrime)) - (log((1.0 - m_par.ϕ_GI) * Sp + GI))
 
-# Spending the authotized investment linearly over 40 periods
+# Spending the authorized investment linearly over 40 periods
 F[indexes.Auth] = (log(AuthPrime)) - 
     (m_par.ρ_GI * log(Auth) + (1.0 - m_par.ρ_GI) * XSS[indexes.AuthSS])
 F[indexes.Auth_lag1] = (log(Auth_lag1Prime)) - (log(Auth))

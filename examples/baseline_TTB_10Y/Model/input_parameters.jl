@@ -39,15 +39,15 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
     # Household preference parameters
     ξ::T = 4.0 | "xi" | "risk aversion" | L"\xi" | _ | false # Kaplan &  Vioalnte (2014)
     γ::T = 2.0 | "gamma" | "inverse Frisch elasticity" | L"\gamma" | _ | false # Chetty et al. (2011)
-    β::T = 0.9815 | "beta" | "discount factor" | L"\beta" | _ | false # 0.9815 BKMS
+    β::T = 0.99 | "beta" | "discount factor" | L"\beta" | _ | false # 0.9815 BKMS
     λ::T =
         0.071 |"lambda" | "illiquid asset adjustment probability" | L"\lambda" | _ | false # 0.071 BKMS
 
     # Individual income process
     ρ_h::T = 0.9815 | "rho" | "autocorrelation of income shocks" | L"\rho" | _ | false # 0.9815 BKMS
-    σ_h::T = 0.135 | "sigma" | "standard deviation of income shocks" | L"\sigma" | _ | false # 0.135 BKMS
+    σ_h::T = 0.125 | "sigma" | "standard deviation of income shocks" | L"\sigma" | _ | false # 0.135 BKMS
     ι::T = 1 / 16 | "iota" | "probability to return worker" | L"\iota" | _ | false # same in BKMS
-    ζ::T = 0.001 | "zeta" | "probability to become entrepreneur" | L"\zeta" | _ | false # 0.001 in BKMS
+    ζ::T = 1 / 4500 | "zeta" | "probability to become entrepreneur" | L"\zeta" | _ | false # 0.001 in BKMS
 
     # Technological parameters
     α::T = 0.32 | "alpha" | "capital share" | L"\alpha" | _ | false # 0.32 BKMS
@@ -68,7 +68,7 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
         true
     μ::T = 1.1 | "mu" | "price markup" | L"\mu" | _ | false # 11 -> 10% in BKMS
     κ::T =
-        1 / 4 | # 0.25 in BKMS
+        1 / 11 | # 0.25 in BKMS
         "kappa" |
         "price adjustment costs" |
         L"\kappa" |
@@ -76,7 +76,7 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
         true
     μw::T = 1.1 | "mu_w" | "wage markup" | L"\mu_w" | _ | false # 11 -> 10% in BKMS
     κw::T =
-        1 / 4 | # 0.25 in BKMS
+        1 / 11 | # 0.25 in BKMS
         "kappa_w" |
         "wage adjustment costs" |
         L"\kappa_w" |
@@ -89,10 +89,10 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
         1.0 + 0.221 | "tau_pro" | "income tax rate progressivity" | L"\tau^p" | _ | false # 0.221 HKS
     Tc::T = 1.0 + 0.0 | "Tc" | "VAT rate (gross)" | L"T_c" | _ | false # 19% VAT in GER
     Tk::T = 1.0 + 0.0 | "Tk" | "capital income tax rate (gross)" | L"T_k" | _ | false # 1+ 0.25 for 25% tax rate in GER?
-    Ttr_1::T = 1.0 | "Ttr1" | "lump-sum transfer param 1" | L"\tau_{tr1}" | _ | false
-    Ttr_2::T = 1.0 | "Ttr2" | "lump-sum transfer param 2" | L"\tau_{tr2}" | _ | false
-    RRB::T = (1.0 .^ 0.25) | "RB" | "real rate on bonds (gross)" | L"RRB" | _ | false
-    Rbar::T = ((1.09 .^ 0.25) .- 1.0) | "Rbar" | "borrowing wedge" | L"\bar R" | _ | false # 0.029 in BKMS
+    Ttr_1::T = 1.0 + 0.0 | "Ttr1" | "lump-sum transfer param 1" | L"\tau_{tr1}" | _ | false
+    Ttr_2::T = 1.0 + 0.0 | "Ttr2" | "lump-sum transfer param 2" | L"\tau_{tr2}" | _ | false
+    RRB::T = (1.0 .^ 0.5) | "RB" | "real rate on bonds (gross)" | L"RRB" | _ | false
+    Rbar::T = ((1.0725 .^ 0.25) .- 1.0) | "Rbar" | "borrowing wedge" | L"\bar R" | _ | false # 0.029 in BKMS
     q::T = 1.0 | "q" | "price of capital" | L"q" | _ | false
     Z::T = 1.0 | "Z" | "Effective TFP (including gov. investment)" | L"Z" | _ | false
     σ::T = 1.0 | "sigma" | "income risk" | L"\sigma" | _ | false
@@ -123,23 +123,23 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
         Beta(beta_pars(0.5, 0.2^2)...) |
         true
     θ_π::T =
-        1.25 | # from BKMS (probably too high)
+        1.25 | # 1.25 in BKMS (probably too high)
         "theta_pi" |
         "reaction of Taylor rule to inflation" |
         L"\theta_\pi" |
         Normal(1.0, 0.3) |
         true
     θ_Y::T =
-        0.0 | # ECB mandate
+        0.125 | # ECB mandate (increase slightly)
         "theta_Y" |
         "reaction of Taylor rule to output" |
         L"\theta_y" |
-        Normal(0.0, 0.0) |
+        Normal(0.125, 0.05) |
         true
 
     # fiscal policy
     scale_prog::Bool =
-        false |
+        true | # crucial for the solver to work for GER
         "scale_prog" |
         "scaling of tax rate with tax base" |
         "scale_prog" |
@@ -397,17 +397,17 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
         _ | 
         false
 
-    ρ_Auth::T = 
+    ρ_GI::T = 
         1.0e-8 | # the investments end abruptly
-        "rho_Auth" | 
+        "rho_GI" | 
         "autocorrelation of gov investment process" | 
-        L"\rho_{Auth}" | 
+        L"\rho_{GI}" | 
         _ |
         false
 
 
     σ_Auth::T =
-        m_par.σ_Gshock * (1.0 / (1.0 - m_par.ρ_Gshock)) * (0.17 / m_par.GI_share) |
+        0.0 | # σ_Gshock * (1.0 / (1.0 - ρ_Gshock)) * (0.17 / GI_share)
         "sigma_Auth" |
         "standard deviation of gov investment shock" |
         L"\sigma_{Auth}" |
@@ -431,7 +431,7 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
         false
 
     η_KG::T = 
-        0.05 | 
+        0.10 | 
         "eta_KG" | 
         "elasticity of public capital stock" | 
         L"\eta_{K^G}" | 
@@ -601,7 +601,7 @@ in the fields `mode_start_file`, `data_file`, `save_mode_file` and `save_posteri
             :Igrowth,
             :GIgrowth,
             :Cgrowth,
-            :GCgrowth,
+            #:GCgrowth,
             :N,
             :wgrowth,
             :RB,
