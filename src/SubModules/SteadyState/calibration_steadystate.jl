@@ -52,7 +52,8 @@ function run_calibration(moments_function, cal_dict, m_par; solver = "NelderMead
     param_vector = [getfield(m_par, k) for k in params_to_calibrate]
 
     # Bounds: use user-specified SearchRange if provided; else compute defaults
-    bounds = solver == "BBO" ? cal_dict["opt_options"][:SearchRange] : []
+    #bounds = solver == "BBO" ? cal_dict["opt_options"][:SearchRange] : []
+    bounds = []
 
     # Objective wrapper: maps optimizer vector -> parameter space -> evaluate moments
     function f_obj(z)

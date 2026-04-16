@@ -19,7 +19,7 @@ library(wid)
 # (real) cons_gov_agg <- rdb(ids = "Eurostat/namq_10_gdp/Q.CLV20_MEUR.SCA.P3_S13.DE")
 
 # current prices in million euro, season & calendar adjusted
-cons_gov_nom <- rdb(ids = "Eurostat/namq_10_gdp/Q.CP_MEUR.SCA.P31_S13.DE")
+cons_gov_nom <- rdb(ids = "Eurostat/namq_10_gdp/Q.CP_MEUR.SCA.P3_S13.DE")
 
 cons_gov_nom <- cons_gov_nom %>%
     rename(cons_gov = value) %>%
@@ -228,6 +228,9 @@ lines(wages_sca_ts, col = "steelblue", lwd = 2)
 legend("topleft", legend = c("Unadjusted", "SCA"),
        col = c("grey60", "steelblue"), lwd = c(1.5, 2), bty = "n")
 
+# Replace by adjusted wages
+master_real$wages <- wages_sca$wages
+
 ## Write as per capita values
 master_pc <- master_real %>%
     mutate(across(c(gdp, cons_gov, cons_priv, inv_gov, inv_priv, wages, hours)
@@ -292,13 +295,20 @@ master_growth_stationary <- master_growth %>%
     ) %>%
     select(period, Ygrowth, GCgrowth, Cgrowth, GIgrowth, Igrowth, wgrowth, N, pi, RB, TOP10Ishare, TOP10Wshare)
 
+## Report important averages
+# Top 10% shares
+T10Iavg <- mean(master_pc$T10Ishare, na.rm = TRUE)
+T10Wavg <- mean(master_pc$T10Wshare, na.rm = TRUE)
+
+# Government spending shares
+GCshare_avg <- mean(master_pc$cons_gov_pc / master_pc$gdp_pc, na.rm = TRUE)
+GIshare_avg <- mean(master_pc$inv_gov_pc / master_pc$gdp_pc, na.rm = TRUE)
 
 ## Tax progrssivity P = (AMTR - ATR)/(1 - ATR)
-
 
 
 # Income risk
 
 
 # save as csv
-write_csv(master_growth_stationary, "examples/baseline_TTB_10Y/Data/GER_growth.csv")
+write_csv(master_growth_stationary, "examples/baseline_TTB_10Y/Data/GER_growth.csv", na = "NaN")

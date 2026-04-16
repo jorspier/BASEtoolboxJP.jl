@@ -39,32 +39,32 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
     # Household preference parameters
     ξ::T = 4.0 | "xi" | "risk aversion" | L"\xi" | _ | false # Kaplan &  Vioalnte (2014)
     γ::T = 2.0 | "gamma" | "inverse Frisch elasticity" | L"\gamma" | _ | false # Chetty et al. (2011)
-    β::T = 0.99 | "beta" | "discount factor" | L"\beta" | _ | false # 0.9815 BKMS
+    β::T = 0.991 | "beta" | "discount factor" | L"\beta" | _ | false # 0.9815 BKMS
     λ::T =
         0.071 |"lambda" | "illiquid asset adjustment probability" | L"\lambda" | _ | false # 0.071 BKMS
 
     # Individual income process
     ρ_h::T = 0.9815 | "rho" | "autocorrelation of income shocks" | L"\rho" | _ | false # 0.9815 BKMS
-    σ_h::T = 0.125 | "sigma" | "standard deviation of income shocks" | L"\sigma" | _ | false # 0.135 BKMS
+    σ_h::T = 0.135 | "sigma" | "standard deviation of income shocks" | L"\sigma" | _ | false # 0.135 BKMS
     ι::T = 1 / 16 | "iota" | "probability to return worker" | L"\iota" | _ | false # same in BKMS
-    ζ::T = 1 / 4500 | "zeta" | "probability to become entrepreneur" | L"\zeta" | _ | false # 0.001 in BKMS
+    ζ::T = 1 / 4500 | "zeta" | "probability to become entrepreneur" | L"\zeta" | _ | false # 0.001 in BKMS 1/4500 in BBL (too sensitive for adjustments)
 
     # Technological parameters
     α::T = 0.32 | "alpha" | "capital share" | L"\alpha" | _ | false # 0.32 BKMS
-    δ_0::T = (0.07 + 0.016) / 4 | "delta" | "depreciation rate" | L"\delta" | _ | false # 0.018 in BKMS
+    δ_0::T = (0.07 + 0.016) / 4 | "delta" | "depreciation rate" | L"\delta" | _ | false # 0.018 in BKMS, (0.07 + 0.016) / 4 in BBL
     δ_s::T =
-        0.1 | # 5 BKMS
+        5.0 | 
         "delta_s" |
         "slope of depreciation rate" |
         L"\delta_s" |
-        Gamma(gamma_pars(5.0, 2.0^2)...) |
+        Gamma(gamma_pars(5.0, 2.0^2)...) | # 5 BKMS, previous prior was 0.1
         true
     ϕ::T =
-        0.5 | # 4 in Bayer et al (2020)
+        4.0 | 
         "phi" |
         "capital adjustment costs" |
         L"\phi" |
-        Gamma(gamma_pars(4.0, 2.0^2)...) |
+        Gamma(gamma_pars(4.0, 2.0^2)...) | # 4 in BKMS, previous prior was 0.5
         true
     μ::T = 1.1 | "mu" | "price markup" | L"\mu" | _ | false # 11 -> 10% in BKMS
     κ::T =
@@ -86,15 +86,15 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
     # Further steady-state parameters
     Tlev::T = 1.0 + 0.3 | "tau_lev" | "income tax rate level" | L"\tau^l" | _ | false # 0.3 BKMS?
     Tprog::T =
-        1.0 + 0.221 | "tau_pro" | "income tax rate progressivity" | L"\tau^p" | _ | false # 0.221 HKS
-    Tc::T = 1.0 + 0.0 | "Tc" | "VAT rate (gross)" | L"T_c" | _ | false # 19% VAT in GER
-    Tk::T = 1.0 + 0.0 | "Tk" | "capital income tax rate (gross)" | L"T_k" | _ | false # 1+ 0.25 for 25% tax rate in GER?
-    Ttr_1::T = 1.0 + 0.0 | "Ttr1" | "lump-sum transfer param 1" | L"\tau_{tr1}" | _ | false
-    Ttr_2::T = 1.0 + 0.0 | "Ttr2" | "lump-sum transfer param 2" | L"\tau_{tr2}" | _ | false
+        1.0 + 0.3 | "tau_pro" | "income tax rate progressivity" | L"\tau^p" | _ | false # 0.221 HKS
+    Tc::T = 1.0 + 0.19 | "Tc" | "VAT rate (gross)" | L"T_c" | _ | false # 19% VAT in GER (breaks if increasing either tax rate)
+    Tk::T = 1.0 + 0.25 | "Tk" | "capital income tax rate (gross)" | L"T_k" | _ | false # 1+ 0.25 for 25% tax rate in GER?
+    Ttr_1::T = 1.0 + 0.5 | "Ttr1" | "lump-sum transfer param 1" | L"\tau_{tr1}" | _ | false
+    Ttr_2::T = 1.0 + 0.8 | "Ttr2" | "lump-sum transfer param 2" | L"\tau_{tr2}" | _ | false
     RRB::T = (1.0 .^ 0.5) | "RB" | "real rate on bonds (gross)" | L"RRB" | _ | false
-    Rbar::T = ((1.0725 .^ 0.25) .- 1.0) | "Rbar" | "borrowing wedge" | L"\bar R" | _ | false # 0.029 in BKMS
+    Rbar::T = ((1.0725 .^ 0.25) .- 1.0) | "Rbar" | "borrowing wedge" | L"\bar R" | _ | false # 0.029 in BKMS, ((1.0725 .^ 0.25) .- 1.0) in BBL
     q::T = 1.0 | "q" | "price of capital" | L"q" | _ | false
-    Z::T = 1.0 | "Z" | "Effective TFP (including gov. investment)" | L"Z" | _ | false
+    Z::T = 1.0 | "Z" | "Effective TFP (including gov. investment)" | L"Z" | _ | false # only TFP?
     σ::T = 1.0 | "sigma" | "income risk" | L"\sigma" | _ | false
 
     # Tradable shares
@@ -129,8 +129,9 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
         L"\theta_\pi" |
         Normal(1.0, 0.3) |
         true
+
     θ_Y::T =
-        0.125 | # ECB mandate (increase slightly)
+        0.0 | # ECB mandate (increase slightly)
         "theta_Y" |
         "reaction of Taylor rule to output" |
         L"\theta_y" |
@@ -178,12 +179,12 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
         true
 
     γ_Bτ::T =
-        0.0 |
+        0.02 |
         "gamma_Btau" |
         "reaction of tax level to debt" |
         L"\gamma_{B^\tau}" |
         Normal(0.0, 1.0) |
-        true
+        false
 
     γ_Yτ::T =
         0.0 |
@@ -243,15 +244,15 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
         true
 
     ρ_Sshock::T =
-        1e-8 |
+        0.0 |
         "rho_Sshock" |
         "autocorrelation of uncertainty shock" |
         L"\rho_{Sshock}" |
-        _ |
+        Gamma(gamma_pars(0.65, 0.3^2)...) |
         false
 
     ρ_Tprogshock::T =
-        1e-8 |
+        0.0 |
         "rho_Pshock" |
         "autocorrelation of tax progressivity shock" |
         L"\rho_{Pshock}" |
@@ -263,7 +264,7 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
         "sigma_Pshock" |
         "standard deviation of tax progressivity shock" |
         L"\sigma_Pshock" |
-        _ |
+        InverseGamma(ig_pars(0.001, 0.02^2)...) |
         false
 
     ρ_Gshock::T =
@@ -390,7 +391,7 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
         false # set 1 for debt-financing and 0 for govt consumption reduction
 
     GI_share::T = 
-        0.03 | # 3% of GDP according to Eurostat
+        0.028 | # 3% of GDP according to Eurostat
         "GI_share" | 
         "steady state government investment share" | 
         L"\frac{GI}{Y}" | 
@@ -423,7 +424,7 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
     #     false 
 
     δ_KG::T =
-        0.01 | # usually lower than private
+        0.01 | # usually lower than private: 1% per quarter (4% per year)
         "delta_KG" |
         "depreciation rate of public capital" |
         L"\delta_{K^G}" |
@@ -512,16 +513,16 @@ Collect parameters for the numerical solution of the model in a `struct`.
     aggr_names::Array{String,1} = ["Something"] # Placeholder for names of aggregates
     distr_names::Array{String,1} = ["Something"] # Placeholder for names of distributions
 
-    naggrstates::Int = 16 # (placeholder for the) number of aggregate states
-    naggrcontrols::Int = 16 # (placeholder for the) number of aggregate controls
-    nstates::Int = nh + nk + nb + naggrstates - 3 # (placeholder for the) number of states + controls in total
-    ncontrols::Int = 16 # (placeholder for the) number of controls in total
-    ntotal::Int = nstates + ncontrols     # (placeholder for the) number of states+ controls in total
-    n_agg_eqn::Int = nstates + ncontrols     # (placeholder for the) number of aggregate equations
-    naggr::Int = length(aggr_names)     # (placeholder for the) number of aggregate states + controls
-    ntotal_r::Int = nstates + ncontrols# (placeholder for the) number of states + controls in total after reduction
-    nstates_r::Int = nstates# (placeholder for the) number of states in total after reduction
-    ncontrols_r::Int = ncontrols# (placeholder for the) number of controls in total after reduction
+    naggrstates::Int    = 16 # (placeholder for the) number of aggregate states
+    naggrcontrols::Int  = 16 # (placeholder for the) number of aggregate controls
+    nstates::Int        = nh + nk + nb + naggrstates - 3 # (placeholder for the) number of states + controls in total
+    ncontrols::Int      = 16 # (placeholder for the) number of controls in total
+    ntotal::Int         = nstates + ncontrols     # (placeholder for the) number of states+ controls in total
+    n_agg_eqn::Int      = nstates + ncontrols     # (placeholder for the) number of aggregate equations
+    naggr::Int          = length(aggr_names)     # (placeholder for the) number of aggregate states + controls
+    ntotal_r::Int       = nstates + ncontrols# (placeholder for the) number of states + controls in total after reduction
+    nstates_r::Int      = nstates# (placeholder for the) number of states in total after reduction
+    ncontrols_r::Int    = ncontrols# (placeholder for the) number of controls in total after reduction
 
     PRightStates::AbstractMatrix = Diagonal(ones(nstates)) # (placeholder for the) Matrix used for second stage reduction (states only)
     PRightAll::AbstractMatrix = Diagonal(ones(ntotal))  # (placeholder for the) Matrix used for second stage reduction

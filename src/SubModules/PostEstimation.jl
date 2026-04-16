@@ -47,6 +47,8 @@ include("PostEstimation/plot_hist_decomp.jl")
 include("PostEstimation/uncondMoments.jl")
 include("PostEstimation/GIRF.jl")
 
+include("PostEstimation/compute_pv_multipliers.jl")
+
 export compute_irfs,
     compute_vardecomp,
     compute_vardecomp_bcfreq,
@@ -60,6 +62,7 @@ export compute_irfs,
     plot_hist_decomp,
     uncondFirstMoment_SO_analytical,
     GIRF_FO,
-    GIRF_SO
+    GIRF_SO,
+    compute_pv_multipliers
 
 end

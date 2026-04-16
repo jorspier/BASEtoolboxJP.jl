@@ -84,8 +84,8 @@ pretty_table(
         "Liquid to Illiquid Assets Ratio" B/K
         "Capital to Output Ratio" K / Y/4.0
         "Government Debt to Output Ratio" Bgov / Y/4.0
-        "Government Spending to Output Ratio" G/Y
-        "Government Investment to Output Ratio" GI/Y
+        "Government Spending to Output Ratio" G/Y # 0.207
+        "Government Investment to Output Ratio" GI/Y # 0.0276
         "TOP 10 Wealth Share" T10W
         "Fraction of Borrower" fr_borr
     ];
@@ -293,6 +293,10 @@ vars_to_plot = [
     (:wF, "Wage"),
     (:π, "Inflation"),
     (:RB, "Nominal rate"),
+    (:RRL, "Return on Bonds"),
+    (:RK, "Return on Capital"),
+    (:LPXA, "Ex-ante Liquidity Premium"),
+    (:LP, "Ex-post Liquidity Premium"),
     #(:σ, "Income risk"),
     #(:Tprog, "Tax progressivity"),
     #(:TOP10Wshare, "Top 10 wealth share"),
@@ -419,6 +423,12 @@ plot_hist_decomp(
     save_fig = true,
     path = paths["bld_example"] * "/HDs_cat",
 );
+
+
+# Print cumulative mutipliers
+println("\n--- Cumulative PV Multipliers: Public Investment (GI) ---")
+table_GI = compute_pv_multipliers(IRFs_mode, IRFs_order, sr_mode.indexes_r, sr_mode.XSS, :GI; max_horizon = 80)
+display(table_GI)
 
 @printf "\n"
 @printf "Done.\n"
