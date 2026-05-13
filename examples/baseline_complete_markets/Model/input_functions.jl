@@ -61,9 +61,21 @@ end
 
 ## Transfers ------------------------------------------------------------------------------
 
-function transfer_scheme(n_par, m_par, args_hh_prob)
-    return zeros(size(n_par.grid_h))
+function transfer_scheme(n_par, m_par, args_hh_prob; distr_h = nothing)
+    @read_args_hh_prob()
+    labor_compensation = wH .* N ./ Hprog
+    tax_base = labor_compensation .+ Π_E
+    g_labor_inc = labor_compensation .* (n_par.grid_h / Htilde) .^ scale_Hprog((Tprog .- 1.0), m_par)
+    n_labor_inc = labor_tax_f.(g_labor_inc, (Tlev .- 1.0), (Tprog .- 1.0), tax_base, m_par.scale_prog)
+    transfer = (m_par.Ttr_1 .- 1.0) .* labor_compensation .- (m_par.Ttr_2 .- 1.0) .* n_labor_inc
+    transfer = max.(transfer, zero(eltype(transfer)))
+    if distr_h === nothing
+        return transfer
+    else
+        return dot(distr_h, transfer) .+ 1.0
+    end
 end
+
 
 ## Optional functions ---------------------------------------------------------------------
 
@@ -75,8 +87,12 @@ end
 function CompMarketsCapital(rK, m_par)
     Z = m_par.Z
     mc = 1 / m_par.μ
-    mcw = 1 / m_par.μw
-    K_over_N = ((rK + m_par.δ_0) / (m_par.α * Z * mc))^(1 / (m_par.α - 1))
+    mcw = 1.0 / m_par.μw
+
+    tau_k = m_par.Tk - 1.0
+    rK_pre_tax = rK / (1.0 - tau_k) # Cpital income tax wedge
+    
+    K_over_N = ((rK_pre_tax + m_par.δ_0) / (m_par.α * Z * mc))^(1 / (m_par.α - 1))
     wF = wage(mc, Z, K_over_N, 1.0, m_par)
     wH = mcw .* wF
     Hprog = 1.0

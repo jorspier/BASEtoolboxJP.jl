@@ -39,19 +39,19 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
     # Household preference parameters
     ξ::T = 4.0 | "xi" | "risk aversion" | L"\xi" | _ | false # Kaplan &  Vioalnte (2014)
     γ::T = 2.0 | "gamma" | "inverse Frisch elasticity" | L"\gamma" | _ | false # Chetty et al. (2011)
-    β::T = 0.991 | "beta" | "discount factor" | L"\beta" | _ | false # 0.9815 BKMS
+    β::T = 0.99 | "beta" | "discount factor" | L"\beta" | _ | false # 0.9815 BKMS
     λ::T =
-        0.071 |"lambda" | "illiquid asset adjustment probability" | L"\lambda" | _ | false # 0.071 BKMS
+        0.045 |"lambda" | "illiquid asset adjustment probability" | L"\lambda" | _ | false # 0.071 BKMS
 
     # Individual income process
-    ρ_h::T = 0.9815 | "rho" | "autocorrelation of income shocks" | L"\rho" | _ | false # 0.9815 BKMS
+    ρ_h::T = 0.9823 | "rho" | "autocorrelation of income shocks" | L"\rho" | _ | false # 0.9815 BKMS
     σ_h::T = 0.135 | "sigma" | "standard deviation of income shocks" | L"\sigma" | _ | false # 0.135 BKMS
     ι::T = 1 / 16 | "iota" | "probability to return worker" | L"\iota" | _ | false # same in BKMS
-    ζ::T = 1 / 4500 | "zeta" | "probability to become entrepreneur" | L"\zeta" | _ | false # 0.001 in BKMS 1/4500 in BBL (too sensitive for adjustments)
+    ζ::T = 0.0007 | "zeta" | "probability to become entrepreneur" | L"\zeta" | _ | false # 0.001 in BKMS 1/4500 in BBL (too sensitive for adjustments)
 
     # Technological parameters
     α::T = 0.32 | "alpha" | "capital share" | L"\alpha" | _ | false # 0.32 BKMS
-    δ_0::T = (0.07 + 0.016) / 4 | "delta" | "depreciation rate" | L"\delta" | _ | false # 0.018 in BKMS, (0.07 + 0.016) / 4 in BBL
+    δ_0::T = 0.02 | "delta" | "depreciation rate" | L"\delta" | _ | false # 0.018 in BKMS, (0.07 + 0.016) / 4 in BBL
     δ_s::T =
         5.0 | 
         "delta_s" |
@@ -68,7 +68,7 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
         true
     μ::T = 1.1 | "mu" | "price markup" | L"\mu" | _ | false # 11 -> 10% in BKMS
     κ::T =
-        1 / 11 | # 0.25 in BKMS
+        0.25 | # 0.25 in BKMS
         "kappa" |
         "price adjustment costs" |
         L"\kappa" |
@@ -76,7 +76,7 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
         true
     μw::T = 1.1 | "mu_w" | "wage markup" | L"\mu_w" | _ | false # 11 -> 10% in BKMS
     κw::T =
-        1 / 11 | # 0.25 in BKMS
+        0.25 | # 0.25 in BKMS
         "kappa_w" |
         "wage adjustment costs" |
         L"\kappa_w" |
@@ -86,15 +86,15 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
     # Further steady-state parameters
     Tlev::T = 1.0 + 0.3 | "tau_lev" | "income tax rate level" | L"\tau^l" | _ | false # 0.3 BKMS?
     Tprog::T =
-        1.0 + 0.3 | "tau_pro" | "income tax rate progressivity" | L"\tau^p" | _ | false # 0.221 HKS
+        1.0 + 0.2 | "tau_pro" | "income tax rate progressivity" | L"\tau^p" | _ | false # 0.221 HKS
     Tc::T = 1.0 + 0.19 | "Tc" | "VAT rate (gross)" | L"T_c" | _ | false # 19% VAT in GER (breaks if increasing either tax rate)
     Tk::T = 1.0 + 0.25 | "Tk" | "capital income tax rate (gross)" | L"T_k" | _ | false # 1+ 0.25 for 25% tax rate in GER?
     Ttr_1::T = 1.0 + 0.5 | "Ttr1" | "lump-sum transfer param 1" | L"\tau_{tr1}" | _ | false
     Ttr_2::T = 1.0 + 0.8 | "Ttr2" | "lump-sum transfer param 2" | L"\tau_{tr2}" | _ | false
     RRB::T = (1.0 .^ 0.5) | "RB" | "real rate on bonds (gross)" | L"RRB" | _ | false
-    Rbar::T = ((1.0725 .^ 0.25) .- 1.0) | "Rbar" | "borrowing wedge" | L"\bar R" | _ | false # 0.029 in BKMS, ((1.0725 .^ 0.25) .- 1.0) in BBL
+    Rbar::T = 0.037966152 | "Rbar" | "borrowing wedge" | L"\bar R" | _ | false # 0.029 in BKMS, ((1.0725 .^ 0.25) .- 1.0) in BBL
     q::T = 1.0 | "q" | "price of capital" | L"q" | _ | false
-    Z::T = 1.0 | "Z" | "Effective TFP (including gov. investment)" | L"Z" | _ | false # only TFP?
+    Z::T = 1.0 | "Z" | "Effective TFP (including gov. investment)" | L"Z" | _ | false 
     σ::T = 1.0 | "sigma" | "income risk" | L"\sigma" | _ | false
 
     # Tradable shares
@@ -123,12 +123,12 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
         Beta(beta_pars(0.5, 0.2^2)...) |
         true
     θ_π::T =
-        1.25 | # 1.25 in BKMS (probably too high)
+        1.25 | # 1.25 in BKMS 
         "theta_pi" |
         "reaction of Taylor rule to inflation" |
         L"\theta_\pi" |
         Normal(1.0, 0.3) |
-        true
+        false
 
     θ_Y::T =
         0.0 | # ECB mandate (increase slightly)
@@ -136,23 +136,23 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
         "reaction of Taylor rule to output" |
         L"\theta_y" |
         Normal(0.125, 0.05) |
-        true
+        false
 
     # fiscal policy
     scale_prog::Bool =
-        true | # crucial for the solver to work for GER
+        false | # crucial for the solver to work for GER
         "scale_prog" |
         "scaling of tax rate with tax base" |
         "scale_prog" |
         _ |
         false
     γ_B::T =
-        0.1 |
+        0.01 |
         "gamma_B" |
         "reaction of deficit to debt" |
         L"\gamma_B" |
         Gamma(gamma_pars(0.1, 0.075^2)...) |
-        true
+        false 
         
     γ_π::T =
         0.0 |
@@ -179,7 +179,7 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
         true
 
     γ_Bτ::T =
-        0.02 |
+        0.0 |
         "gamma_Btau" |
         "reaction of tax level to debt" |
         L"\gamma_{B^\tau}" |
@@ -407,24 +407,44 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
         false
 
 
+    ρ_GI_news_shock::T =
+        1e-8 |
+        "rho_GI_news_shock" |
+        "autocorrelation of government investment news shock" |
+        L"\rho_{GI\,news}" |
+        _ |
+        false
+
+    σ_GI_news_shock::T =
+        log(1.0 + 0.01453 / GI_share) |
+        "sigma_GI_news_shock" |
+        "standard deviation of government investment news shock (500bn over 40 quarters)" |
+        L"\sigma_{GI\,news}" |
+        InverseGamma(ig_pars(0.001, 0.02^2)...) |
+        false
+
+    ## Scaling of the investment shock:
+    # 500bn€ for 40 quarters = 12.5bn€ per quarter
+    # approximately 1.453% of quarterly output
+    # News shock hits all 39 GI_news variables equally at t=0
     σ_Auth::T =
-        0.0 | # σ_Gshock * (1.0 / (1.0 - ρ_Gshock)) * (0.17 / GI_share)
+        0.0 |
         "sigma_Auth" |
-        "standard deviation of gov investment shock" |
+        "standard deviation of gov investment shock (deprecated, using news cascade)" |
         L"\sigma_{Auth}" |
         InverseGamma(ig_pars(0.001, 0.02^2)...) |
-        true # scaled to same monetary value as spending shock
+        false
 
-    # ϕ_GI::T =
-    #     1/12 |
-    #     "phi_GI" |
-    #     "completion rate of gov investment" |
-    #     L"\phi_{GI}" |
-    #     _ |
-    #     false 
+    ϕ_GI::T =
+        1/15 |
+        "phi_GI" |
+        "spending rate of gov investment pipeline" |
+        L"\phi_{GI}" |
+        _ |
+        false
 
     δ_KG::T =
-        0.01 | # usually lower than private: 1% per quarter (4% per year)
+        0.015 | # usually lower than private: 2% per quarter (8% per year)
         "delta_KG" |
         "depreciation rate of public capital" |
         L"\delta_{K^G}" |
@@ -464,14 +484,14 @@ Collect parameters for the numerical solution of the model in a `struct`.
     GHH::Bool = true
 
     # regular grid
-    nh::Int = 14
+    nh::Int = 12
     nk::Int = 60
     nb::Int = 60
 
     # copula grid
-    nh_copula::Int = 5 # rule of thumb: divide nh, without entrepreneur, by two
-    nk_copula::Int = 5 # rule of thumb: divide nk by twelve
-    nb_copula::Int = 5 # rule of thumb: divide nb by twelve
+    nh_copula::Int = 6 # rule of thumb: divide nh, without entrepreneur, by two
+    nk_copula::Int = 4 # rule of thumb: divide nk by twelve
+    nb_copula::Int = 4 # rule of thumb: divide nb by twelve
 
     # coarse grid in find_steadystate
     nh_coarse::Int = 4
@@ -594,15 +614,18 @@ in the fields `mode_start_file`, `data_file`, `save_mode_file` and `save_posteri
     irf_matching::Bool = false
     irf_matching_dict::Dict = Dict()
 
-    shock_names::Array{Symbol,1} = shock_names # set in Model/input_aggregate_names.jl
+    # shock_names::Array{Symbol,1} = shock_names # set in Model/input_aggregate_names.jl
+    # Alternative model versions / shock structures commented out
+	shock_names::Array{Symbol, 1} = [:A, :Z, :ZI, :μ, :μw, :Gshock, :Rshock] # omit Auth
+    
     observed_vars_input::Array{Symbol,1} =
         irf_matching ? [:G, :Y, :B, :I, :LPXA] :
         [
             :Ygrowth,
             :Igrowth,
-            :GIgrowth,
+            #:GIgrowth, # for predetermined MA shock, estimating GI shock from the data would be flawed
             :Cgrowth,
-            #:GCgrowth,
+            #:GCgrowth, # GC is determined residually, so not included in estimation
             :N,
             :wgrowth,
             :RB,
@@ -621,7 +644,7 @@ in the fields `mode_start_file`, `data_file`, `save_mode_file` and `save_posteri
         #:tauprog => :τprog,
         :w90share => :TOP10Wshare,
         :I90share => :TOP10Ishare,
-    ) # add GI name, depending on data file
+    ) 
 
     me_treatment::Symbol = :unbounded
     me_std_cutoff::Float64 = 0.2
@@ -642,14 +665,17 @@ in the fields `mode_start_file`, `data_file`, `save_mode_file` and `save_posteri
 
     max_iter_mode::Int = 3
     optimizer::Optim.AbstractOptimizer = NelderMead()
-    compute_hessian::Bool = false    # true: computes Hessian at posterior mode; false: sets Hessian to identity matrix
+    compute_hessian::Bool = false    # true: computes Hessian at posterior mode; 
+                                     # false: (sets Hessian to identity matrix) 
+                                        # new false: 1% proportional standard deviation of parameters
+    
     f_tol::Float64 = 1.0e-4
     x_tol::Float64 = 1.0e-4
 
     multi_chain_init::Bool = false
-    ndraws::Int = 400
-    burnin::Int = 100
-    mhscale::Float64 = 0.00015
-    debug_print::Bool = true
+    ndraws::Int = 1000
+    burnin::Int = 200
+    mhscale::Float64 = 0.1 # scales step size for MCMC, target acceptance rate of around 0.25
+    debug_print::Bool = false
     seed::Int = 778187
 end

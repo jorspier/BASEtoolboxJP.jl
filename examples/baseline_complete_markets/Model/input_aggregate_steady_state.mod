@@ -13,6 +13,7 @@ RshockSS = 1.0
 GshockSS = 1.0
 TprogshockSS = 1.0
 SshockSS = 1.0
+TFPSS = 1.0
 
 ## Growth rates
 YgrowthSS = 1.0
@@ -21,6 +22,7 @@ IgrowthSS = 1.0
 wgrowthSS = 1.0
 CgrowthSS = 1.0
 TgrowthSS = 1.0
+GIgrowthSS = 1.0
 
 ## Further assumptions (partly also used in args_hh_prob)
 mcSS = 1.0 ./ μSS
@@ -42,6 +44,59 @@ YSS = output(ZSS, KSS, NSS, m_par)
 ISS = m_par.δ_0 * KSS
 Π_FSS = (1.0 - mcSS) .* YSS
 
+# government investment shock
+GI_news_shockSS = 1.0
+
+# Government invetsment
+GISS = m_par.GI_share * YSS
+KGSS = GISS / m_par.δ_KG
+
+# All news variables in steady state equal realized GI
+GI_news_1SS = GISS
+GI_news_2SS = GISS
+GI_news_3SS = GISS
+GI_news_4SS = GISS
+GI_news_5SS = GISS
+GI_news_6SS = GISS
+GI_news_7SS = GISS
+GI_news_8SS = GISS
+GI_news_9SS = GISS
+GI_news_10SS = GISS
+GI_news_11SS = GISS
+GI_news_12SS = GISS
+GI_news_13SS = GISS
+GI_news_14SS = GISS
+GI_news_15SS = GISS
+GI_news_16SS = GISS
+GI_news_17SS = GISS
+GI_news_18SS = GISS
+GI_news_19SS = GISS
+GI_news_20SS = GISS
+GI_news_21SS = GISS
+GI_news_22SS = GISS
+GI_news_23SS = GISS
+GI_news_24SS = GISS
+GI_news_25SS = GISS
+GI_news_26SS = GISS
+GI_news_27SS = GISS
+GI_news_28SS = GISS
+GI_news_29SS = GISS
+GI_news_30SS = GISS
+GI_news_31SS = GISS
+GI_news_32SS = GISS
+GI_news_33SS = GISS
+GI_news_34SS = GISS
+GI_news_35SS = GISS
+GI_news_36SS = GISS
+GI_news_37SS = GISS
+GI_news_38SS = GISS
+GI_news_39SS = GISS
+
+GI_lag1SS = GISS
+GI_lag2SS = GISS
+GI_lag3SS = GISS
+GI_lag4SS = GISS
+
 # financial market
 LPSS = RKSS / (RBSS / πSS)
 LPXASS = LPSS
@@ -51,14 +106,17 @@ TotalAssetsSS = BSS + qSS * KSS
 
 # fiscal side
 RK_before_taxesSS = ((RKSS - 1.0) ./ (1.0 - (TkSS - 1.0))) + 1.0
-
+distr_hSS = (n_par.Π^1000)[1, :]
+TRSS = transfer_scheme(n_par, m_par, args_hh_prob; distr_h = distr_hSS)
+ 
 # jointly determine C, T, G (interacted through consumption tax)
 # resource constaint, plugged in government budget constraint and tax revenues
 CSS =
     (
         YSS - ISS + (RRLSS - 1.0) * BgovSS - (
             (TbarSS .- 1.0) .* (wHSS .* NSS + Π_ESS + Π_USS) +
-            (TkSS .- 1.0) .* (RK_before_taxesSS .- 1.0) .* KSS
+            (TkSS .- 1.0) .* (RK_before_taxesSS .- 1.0) .* KSS - 
+            (TRSS .- 1.0)
         )
     ) ./ (1.0 + (TcSS .- 1.0))
 
@@ -66,10 +124,11 @@ CSS =
 TSS =
     (TbarSS .- 1.0) .* (wHSS .* NSS + Π_ESS + Π_USS) +
     (TcSS .- 1.0) .* CSS +
-    (TkSS .- 1.0) .* (RK_before_taxesSS .- 1.0) .* KSS
+    (TkSS .- 1.0) .* (RK_before_taxesSS .- 1.0) .* KSS - 
+    (TRSS .- 1.0)
 
 # government spending from budget constraint
-GSS = TSS - (RRLSS - 1.0) * BgovSS
+GSS = TSS - (RRLSS - 1.0) * BgovSS - GISS
 
 # remaining aggregates
 BYSS = BSS / YSS

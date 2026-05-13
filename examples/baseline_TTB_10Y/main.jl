@@ -3,7 +3,7 @@ Mainboard for the baseline example of the BASEforHANK package.
 """
 global_start_time = time()
 
-using PrettyTables, Printf, BenchmarkTools;
+using PrettyTables, Printf, BenchmarkTools, LinearAlgebra;
 
 ## ------------------------------------------------------------------------------------------
 ## Header: set up paths, pre-process user inputs, load module
@@ -73,8 +73,6 @@ Y = exp.(sr_full.XSS[sr_full.indexes.YSS]);
 T10W = exp(sr_full.XSS[sr_full.indexes.TOP10WshareSS]);
 G = exp.(sr_full.XSS[sr_full.indexes.GSS]);
 fr_borr = BASEforHANK.eval_cdf(sr_full.distrSS, :b, sr_full.n_par, 0.0);
-# new
-GI = exp.(sr_full.XSS[sr_full.indexes.GISS]);
 KG = exp.(sr_full.XSS[sr_full.indexes.KGSS]);
 
 # Display steady state moments
@@ -85,12 +83,11 @@ pretty_table(
         "Capital to Output Ratio" K / Y/4.0
         "Government Debt to Output Ratio" Bgov / Y/4.0
         "Government Spending to Output Ratio" G/Y # 0.207
-        "Government Investment to Output Ratio" GI/Y # 0.0276
         "TOP 10 Wealth Share" T10W
         "Fraction of Borrower" fr_borr
     ];
     header = ["Variable", "Value"],
-    title = "Steady State Moments",
+    title = "10Y HANK Steady State Moments",
     formatters = ft_printf("%.4f"),
 )
 
@@ -105,24 +102,6 @@ jldsave(paths["bld_example"] * "/linearresults.jld2", true; lr_full);
 # sparse state-space representation
 sr_reduc = model_reduction(sr_full, lr_full, m_par);
 lr_reduc = update_model(sr_reduc, lr_full, m_par);
-
-# # Eigenvalue diagnostics
-# using LinearAlgebra
-# eigenvals = eigvals(n_par.nstates_r)
-# eigenvals_sorted = sort(abs.(eigenvals), rev=true)
-
-# @printf "\n=== State Space Check ===\n"
-# @printf "Number of states: %d (expected: 267)\n" size(n_par.nstates_r, 1)
-
-# @printf "\nTop 15 eigenvalues:\n"
-# for i in 1:min(15, length(eigenvals_sorted))
-#     @printf "  %2d: %.10f" i eigenvals_sorted[i]
-#     if i < length(eigenvals_sorted) && abs(eigenvals_sorted[i] - eigenvals_sorted[i+1]) < 1e-8
-#         @printf "  ← DUPLICATE"
-#     end
-#     @printf "\n"
-# end
-# @printf "\n"
 
 # save the reduction
 jldsave(paths["bld_example"] * "/reduction.jld2", true; sr_reduc, lr_reduc);
@@ -145,6 +124,13 @@ if e_set.estimate_model == true
     er_mode, posterior_mode, smoother_mode, sr_mode, lr_mode, m_par_mode =
         find_mode(sr_reduc, lr_reduc, m_par, e_set)
 
+    # Adjust starting values for MCMC sampling to proportional 1% steps
+    hank_start_vals = er_mode.par_final
+    step_sizes = (abs.(hank_start_vals) .* 0.01) .+ 1e-4
+    variances = step_sizes .^ 2
+    hessian_diag = 1.0 ./ variances # Invert to create the Hessian and inject it into er_mode
+    @set! er_mode.hessian_final = Matrix(Diagonal(hessian_diag))
+        
     # Only relevant output for later plotting will be saved.
     # If you require all smoother output including the variance estimates
     # over time, items 4 and 5, comment out the next line.
@@ -269,7 +255,6 @@ horizon = 80;
 IRFs_order[IRFs_order .== :Auth] .= :GI
 
 shocks_to_plot = [
-    #(:Z, "Effective TFP"),
     (:GI, "Gov. Investment"), 
     #(:TFP, "TFP Shock"),
     #(:ZI, "Inv.-spec. tech."),
@@ -326,7 +311,7 @@ mkpath(paths["bld_example"] * "/IRFs_cat");
 plot_irfs_cat(
     Dict(
         ("Monetary", "mon") => [:Rshock, :A],
-        ("Fiscal", "fis") => [:Gshock, :Tprogshock, :GI],
+        ("Fiscal", "fis") => [:Gshock, :GI], # :Tprogshock,
         ("Productivity", "pro") => [:TFP, :ZI, :μ, :μw],
     ),
     vars_to_plot,
@@ -360,7 +345,7 @@ plot_vardecomp(
     sr_mc.indexes_r;
     shock_categories = Dict(
         ("Monetary", "mon") => [:Rshock, :A],
-        ("Fiscal", "fis") => [:Gshock, :Tprogshock, :GI],
+        ("Fiscal", "fis") => [:Gshock, :GI], # :Tprogshock,
         ("Productivity", "pro") => [:TFP, :ZI, :μ, :μw],
     ),
     show_fig = false,
@@ -387,7 +372,7 @@ plot_vardecomp_bcfreq(
     sr_mc.indexes_r;
     shock_categories = Dict(
         ("Monetary", "mon") => [:Rshock, :A],
-        ("Fiscal", "fis") => [:Gshock, :Tprogshock, :GI],
+        ("Fiscal", "fis") => [:Gshock, :GI], # :Tprogshock,
         ("Productivity", "pro") => [:TFP, :ZI, :μ, :μw],
     ),
     show_fig = false,
@@ -415,7 +400,7 @@ plot_hist_decomp(
     sr_mc.indexes_r;
     shock_categories = Dict(
         ("Monetary", "mon") => [:Rshock, :A],
-        ("Fiscal", "fis") => [:Gshock, :Tprogshock, :GI],
+        ("Fiscal", "fis") => [:Gshock, :GI], # :Tprogshock,
         ("Productivity", "pro") => [:TFP, :ZI, :μ, :μw],
     ),
     timeline = collect(1991.25:0.25:2025.75), #adjust

@@ -97,6 +97,7 @@ end
 # K/N (capital intensity) from rearranging interest function, then, compute full insurance
 # labor supply and return K given these assumptions. This is hard-coded and should be
 # adjusted if the model changes.
+
 function CompMarketsCapital(rK, m_par)
     Z = m_par.Z
     mc = 1 / m_par.μ

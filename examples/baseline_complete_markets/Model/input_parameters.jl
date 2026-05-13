@@ -39,35 +39,34 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
     # Household preference parameters
     ξ::T = 4.0 | "xi" | "risk aversion" | L"\xi" | _ | false
     γ::T = 2.0 | "gamma" | "inverse Frisch elasticity" | L"\gamma" | _ | false
-    β::T = 0.98255 | "beta" | "discount factor" | L"\beta" | _ | false
-    λ::T =
-        0.065 | "lambda" | "illiquid asset adjustment probability" | L"\lambda" | _ | false
+    β::T = 0.9901 | "beta" | "discount factor" | L"\beta" | _ | false # 0.9917425270049023
+    λ::T = 0.0466 | "lambda" | "illiquid asset adjustment probability" | L"\lambda" | _ | false # 0.053362065374623756
 
     # Individual income process
-    ρ_h::T = 0.98 | "rho" | "autocorrelation of income shocks" | L"\rho" | _ | false
-    σ_h::T = 0.12 | "sigma" | "standard deviation of income shocks" | L"\sigma" | _ | false
+    ρ_h::T = 0.9823 | "rho" | "autocorrelation of income shocks" | L"\rho" | _ | false
+    σ_h::T = 0.135 | "sigma" | "standard deviation of income shocks" | L"\sigma" | _ | false
     ι::T = 1 / 16 | "iota" | "probability to return worker" | L"\iota" | _ | false
-    ζ::T = 1 / 4500 | "zeta" | "probability to become entrepreneur" | L"\zeta" | _ | false
+    ζ::T = 0.001 | "zeta" | "probability to become entrepreneur" | L"\zeta" | _ | false
 
     # Technological parameters
-    α::T = 0.318 | "alpha" | "capital share" | L"\alpha" | _ | false
-    δ_0::T = 0.0215 | "delta" | "depreciation rate" | L"\delta" | _ | false
+    α::T = 0.32 | "alpha" | "capital share" | L"\alpha" | _ | false
+    δ_0::T = 0.018 | "delta" | "depreciation rate" | L"\delta" | _ | false
     δ_s::T = 0.70557 | "delta_s" | "slope of depreciation rate" | L"\delta_s" | _ | false
-    ϕ::T = 1.94092 | "phi" | "capital adjustment costs" | L"\phi" | _ | false
-    μ::T = 1.1 | "mu" | "price markup" | L"\mu" | _ | false
-    κ::T = 0.14561 | "kappa" | "price adjustment costs" | L"\kappa" | _ | false
-    μw::T = 1.1 | "mu_w" | "wage markup" | L"\mu_w" | _ | false
-    κw::T = 0.23931 | "kappa_w" | "wage adjustment costs" | L"\kappa_w" | _ | false
+    ϕ::T = 4.0 | "phi" | "capital adjustment costs" | L"\phi" | _ | false # 1.94092
+    μ::T = 1.1 | "mu" | "price markup" | L"\mu" | _ | false # 1.05
+    κ::T = 0.25 | "kappa" | "price adjustment costs" | L"\kappa" | _ | false # 0.14561
+    μw::T = 1.1 | "mu_w" | "wage markup" | L"\mu_w" | _ | false # 1.05
+    κw::T = 0.25 | "kappa_w" | "wage adjustment costs" | L"\kappa_w" | _ | false # 0.23931
 
     # Further steady-state parameters
-    Tlev::T = 1.1775 | "tau_lev" | "income tax rate level" | L"\tau^l" | _ | false
-    Tprog::T = 1.1022 | "tau_pro" | "income tax rate progressivity" | L"\tau^p" | _ | false
-    Tc::T = 1.0 + 0.0 | "Tc" | "VAT rate (gross)" | L"T_c" | _ | false
-    Tk::T = 1.0 + 0.0 | "Tk" | "capital income tax rate (gross)" | L"T_k" | _ | false
-    Ttr_1::T = 1.0 | "Ttr1" | "lump-sum transfer param 1" | L"\tau_{tr1}" | _ | false
-    Ttr_2::T = 1.0 | "Ttr2" | "lump-sum transfer param 2" | L"\tau_{tr2}" | _ | false
+    Tlev::T = 1.0 + 0.3 | "tau_lev" | "income tax rate level" | L"\tau^l" | _ | false # 0.1225298495374623756
+    Tprog::T = 1.0 + 0.221 | "tau_pro" | "income tax rate progressivity" | L"\tau^p" | _ | false
+    Tc::T = 1.0 + 0.19 | "Tc" | "VAT rate (gross)" | L"T_c" | _ | false
+    Tk::T = 1.0 + 0.25 | "Tk" | "capital income tax rate (gross)" | L"T_k" | _ | false
+    Ttr_1::T = 1.5 | "Ttr1" | "lump-sum transfer param 1" | L"\tau_{tr1}" | _ | false
+    Ttr_2::T = 1.8 | "Ttr2" | "lump-sum transfer param 2" | L"\tau_{tr2}" | _ | false
     RRB::T = 1.0 | "RB" | "real rate on bonds (gross)" | L"RRB" | _ | false
-    Rbar::T = 0.02178 | "Rbar" | "borrowing wedge" | L"\bar R" | _ | false
+    Rbar::T = 0.029 | "Rbar" | "borrowing wedge" | L"\bar R" | _ | false # 0.036798968157815665
     q::T = 1.0 | "q" | "price of capital" | L"q" | _ | false
     Z::T = 1.0 | "Z" | "TFP" | L"Z" | _ | false
     σ::T = 1.0 | "sigma" | "income risk" | L"\sigma" | _ | false
@@ -78,16 +77,16 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
     ιΠ::T = 0.016 | "iotaPi" | "fraction depreciating shares" | L"\iota^{\Pi}" | _ | false
 
     # monetary policy
-    ρ_R::T = 0.80306 | "rho_R" | "persistence of Taylor rule" | L"\rho_R" | _ | false
+    ρ_R::T = 0.75 | "rho_R" | "persistence of Taylor rule" | L"\rho_R" | _ | false
     θ_π::T =
-        2.07808 |
+        1.25 |
         "theta_pi" |
         "reaction of Taylor rule to inflation" |
         L"\theta_\pi" |
         _ |
         false
     θ_Y::T =
-        0.21873 |
+        0.0 |
         "theta_Y" |
         "reaction of Taylor rule to output" |
         L"\theta_y" |
@@ -102,27 +101,26 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
         "scale_prog" |
         _ |
         false
-    γ_B::T = 0.102013 | "gamma_B" | "reaction of deficit to debt" | L"\gamma_B" | _ | false
+    γ_B::T = 0.01 | "gamma_B" | "reaction of deficit to debt" | L"\gamma_B" | _ | false # 0.1
     γ_π::T =
-        -2.1737 |
+        0.0 | # -2.1737
         "gamma_pi" |
         "reaction of deficit to inflation" |
         L"\gamma_{\pi}" |
         _ |
         false
     γ_Y::T =
-        -0.43631 | "gamma_Y" | "reaction of deficit to output" | L"\gamma_Y" | _ | false
-
-    ρ_τ::T = 0.49265 | "rho_tau" | "persistence of tax rule" | L"\rho_\tau" | _ | false
+        0.0 | "gamma_Y" | "reaction of deficit to output" | L"\gamma_Y" | _ | false # -0.43631
+    ρ_τ::T = 0.5 | "rho_tau" | "persistence of tax rule" | L"\rho_\tau" | _ | false
     γ_Bτ::T =
-        3.29306 |
+        0.0  |
         "gamma_Btau" |
         "reaction of tax level to debt" |
         L"\gamma_B^\tau" |
         _ |
         false
     γ_Yτ::T =
-        -0.92073 |
+        0.0 | # -0.92073
         "gamma_Ytau" |
         "reaction of tax level to output" |
         L"\gamma_Y_\tau" |
@@ -212,9 +210,9 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
         _ |
         false
 
-    ρ_Z::T = 0.99782 | "rho_Z" | "autocorrelation of TFP shock" | L"\rho_Z" | _ | false
-    σ_Z::T =
-        0.00601 | "sigma_Z" | "standard deviation of TFP shock" | L"\sigma_Z" | _ | false
+    ρ_TFP::T = 0.99782 | "rho_TFP" | "autocorrelation of TFP shock" | L"\rho_{TFP}" | _ | false
+    σ_TFP::T =
+        0.00601 | "sigma_TFP" | "standard deviation of TFP shock" | L"\sigma_{TFP}" | _ | false
 
     ρ_ZI::T =
         0.76371 |
@@ -282,6 +280,15 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
         L"\Sigma_N" |
         _ |
         false
+
+    # Government invetsment parameters
+	γ_GI::T = 1.0 | "gamma_GI" | "reaction of deficit to public investment" | L"\gamma_{GI}" | _ | false # reaction of deficit to government investment
+	GI_share::T = 0.028 | "GI_share" | "steady state government investment share" | L"\frac{GI}{Y}" | _ | false # share of government investment in output
+	ρ_GI::T = 0.0 | "rho_GI" | "autocorrelation of gov investment process" | L"\rho_{GI}" | _ | false # Pers. of government investment shock
+	σ_Auth::T = 0.0 | "sigma_Auth" | "standard deviation of gov investment shock (deprecated, using news cascade)" | L"\sigma_{Auth}" | InverseGamma(ig_pars(0.001, 0.02^2)...) | false # Std of government investment shock
+	#ϕ_GI::T = 1/15 | "phi_GI" | "spending rate of gov investment pipeline" | L"\phi_{GI}" | _ | false # fraction of authorized pipeline spent per period
+	δ_KG::T = 0.015 | "delta_KG" | "depreciation rate of public capital" | L"\delta_{KG}" | _ | false # depreciation rate of government capital
+	η_KG::T = 0.10 | "eta_KG" | "elasticity of public capital stock" | L"\eta_{KG}" | _ | false # efficiency of government capital in producing public services
 end
 
 """

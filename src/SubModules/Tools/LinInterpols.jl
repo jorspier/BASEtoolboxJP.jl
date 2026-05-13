@@ -137,7 +137,7 @@ function mylinearinterpolate!(
     n_xgrd = length(xgrd)
     @views for i in eachindex(xeval)
         xi = xeval[i]
-        if xi .> xgrd[end - 1]
+        if xi .>= xgrd[end - 1]
             iL = n_xgrd - 1
         elseif xi .< xgrd[2]
             iL = 1
@@ -146,7 +146,8 @@ function mylinearinterpolate!(
         end
         iR = iL + 1
         xL = xgrd[iL]
-        wR = (xi .- xL) ./ (xgrd[iR] .- xL)
+        dx = xgrd[iR] .- xL # added to avoid division by zero if CDF is flat
+        wR = iszero(dx) ? zero(dx) : (xi .- xL) ./ dx
         wL = 1.0 - wR
         yeval[i] = wL .* ygrd[iL] .+ wR .* ygrd[iR]
     end
@@ -218,7 +219,7 @@ function mylinearinterpolate_mult2!(
     @views @inbounds begin
         for i in eachindex(xeval)
             xi = xeval[i]
-            if xi .> xgrd[end - 1]
+            if xi .>= xgrd[end - 1]
                 iL = n_xgrd - 1
             elseif xi .< xgrd[2]
                 iL = 1
@@ -317,7 +318,8 @@ function mylinearinterpolate_mult3!(
         end
         iR = iL + 1
         xL = xgrd[iL]
-        wR = (xi .- xL) ./ (xgrd[iR] .- xL)
+        dx = xgrd[iR] .- xL # added to avoid division by zero if CDF is flat
+        wR = iszero(dx) ? zero(dx) : (xi .- xL) ./ dx
         y1L = ygrd1[iL]
         y2L = ygrd2[iL]
         y3L = ygrd3[iL]
@@ -650,7 +652,7 @@ function eval_Akima1(xgrd1::AbstractVector, coeffs::AbstractArray, xeval::Abstra
     yeval = Array{T,1}(undef, length(xeval))
     @views for i in eachindex(xeval)
         xi = xeval[i]
-        if xi .> xgrd1[end - 1]
+        if xi .>= xgrd1[end - 1]
             iL = n_xgrd - 1
         elseif xi .< xgrd1[2]
             iL = 1
@@ -837,7 +839,7 @@ function eval_Akima2(
 
     @views for i in eachindex(xeval1)
         xi = xeval1[i]
-        if xi .> xgrd1[end - 1]
+        if xi .>= xgrd1[end - 1]
             iL = n_xgrd1 - 1
         elseif xi .< xgrd1[2]
             iL = 1
@@ -849,7 +851,7 @@ function eval_Akima2(
     end
     @views for i in eachindex(xeval2)
         xi = xeval2[i]
-        if xi .> xgrd2[end - 1]
+        if xi .>= xgrd2[end - 1]
             iL = n_xgrd2 - 1
         elseif xi .< xgrd2[2]
             iL = 1
@@ -1213,7 +1215,7 @@ function eval_Akima3(
 
     @views for i in eachindex(xeval1)
         xi = xeval1[i]
-        if xi .> xgrd1[end - 1]
+        if xi .>= xgrd1[end - 1]
             iL = n_xgrd1 - 1
         elseif xi .< xgrd1[2]
             iL = 1
@@ -1226,7 +1228,7 @@ function eval_Akima3(
     end
     @views for i in eachindex(xeval2)
         xi = xeval2[i]
-        if xi .> xgrd2[end - 1]
+        if xi .>= xgrd2[end - 1]
             iL = n_xgrd2 - 1
         elseif xi .< xgrd2[2]
             iL = 1
@@ -1239,7 +1241,7 @@ function eval_Akima3(
     end
     @views for i in eachindex(xeval3)
         xi = xeval3[i]
-        if xi .> xgrd3[end - 1]
+        if xi .>= xgrd3[end - 1]
             iL = n_xgrd3 - 1
         elseif xi .< xgrd3[2]
             iL = 1

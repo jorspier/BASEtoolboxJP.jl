@@ -295,83 +295,62 @@ F[indexes.u] = (log(MPKserv)) - (log(q * (δ_1 + δ_2 * (u - 1.0))))
 # Investment-good productivity
 F[indexes.ZI] = (log(ZIPrime)) - (m_par.ρ_ZI * log(ZI))
 
-## Government investment ---------------------------------------------------------------------
+## Government investment: News shock cascade -------
 
-# Investment shock Law of Motion (set to zero for single period announcement)
-#F[indexes.GI] = (log(GIPrime)) - (m_par.ρ_GI * log(GI) + 
-#    (1.0 - m_par.ρ_GI) * XSS[indexes.GISS])
+# Government investment news shock process
+F[indexes.GI_news_shock] = (log(GI_news_shockPrime)) - (m_par.ρ_GI_news_shock * log(GI_news_shock))
 
-# Pipeline (stock) of public capital
-# F[indexes.Sp] = (log(SpPrime)) - (log((1.0 - m_par.ϕ_GI) * Sp + GI))
+# News cascade: GI_news_k contains announced value for k periods ahead
+# Shock is applied multiplicatively to scale all news variables equally
+F[indexes.GI_news_1]  = log(GI_news_1Prime / GI_news_shock)  - log(GI_news_2)
+F[indexes.GI_news_2]  = log(GI_news_2Prime / GI_news_shock)  - log(GI_news_3)
+F[indexes.GI_news_3]  = log(GI_news_3Prime / GI_news_shock)  - log(GI_news_4)
+F[indexes.GI_news_4]  = log(GI_news_4Prime / GI_news_shock)  - log(GI_news_5)
+F[indexes.GI_news_5]  = log(GI_news_5Prime / GI_news_shock)  - log(GI_news_6)
+F[indexes.GI_news_6]  = log(GI_news_6Prime / GI_news_shock)  - log(GI_news_7)
+F[indexes.GI_news_7]  = log(GI_news_7Prime / GI_news_shock)  - log(GI_news_8)
+F[indexes.GI_news_8]  = log(GI_news_8Prime / GI_news_shock)  - log(GI_news_9)
+F[indexes.GI_news_9]  = log(GI_news_9Prime / GI_news_shock)  - log(GI_news_10)
+F[indexes.GI_news_10] = log(GI_news_10Prime / GI_news_shock) - log(GI_news_11)
+F[indexes.GI_news_11] = log(GI_news_11Prime / GI_news_shock) - log(GI_news_12)
+F[indexes.GI_news_12] = log(GI_news_12Prime / GI_news_shock) - log(GI_news_13)
+F[indexes.GI_news_13] = log(GI_news_13Prime / GI_news_shock) - log(GI_news_14)
+F[indexes.GI_news_14] = log(GI_news_14Prime / GI_news_shock) - log(GI_news_15)
+F[indexes.GI_news_15] = log(GI_news_15Prime / GI_news_shock) - log(GI_news_16)
+F[indexes.GI_news_16] = log(GI_news_16Prime / GI_news_shock) - log(GI_news_17)
+F[indexes.GI_news_17] = log(GI_news_17Prime / GI_news_shock) - log(GI_news_18)
+F[indexes.GI_news_18] = log(GI_news_18Prime / GI_news_shock) - log(GI_news_19)
+F[indexes.GI_news_19] = log(GI_news_19Prime / GI_news_shock) - log(GI_news_20)
+F[indexes.GI_news_20] = log(GI_news_20Prime / GI_news_shock) - log(GI_news_21)
+F[indexes.GI_news_21] = log(GI_news_21Prime / GI_news_shock) - log(GI_news_22)
+F[indexes.GI_news_22] = log(GI_news_22Prime / GI_news_shock) - log(GI_news_23)
+F[indexes.GI_news_23] = log(GI_news_23Prime / GI_news_shock) - log(GI_news_24)
+F[indexes.GI_news_24] = log(GI_news_24Prime / GI_news_shock) - log(GI_news_25)
+F[indexes.GI_news_25] = log(GI_news_25Prime / GI_news_shock) - log(GI_news_26)
+F[indexes.GI_news_26] = log(GI_news_26Prime / GI_news_shock) - log(GI_news_27)
+F[indexes.GI_news_27] = log(GI_news_27Prime / GI_news_shock) - log(GI_news_28)
+F[indexes.GI_news_28] = log(GI_news_28Prime / GI_news_shock) - log(GI_news_29)
+F[indexes.GI_news_29] = log(GI_news_29Prime / GI_news_shock) - log(GI_news_30)
+F[indexes.GI_news_30] = log(GI_news_30Prime / GI_news_shock) - log(GI_news_31)
+F[indexes.GI_news_31] = log(GI_news_31Prime / GI_news_shock) - log(GI_news_32)
+F[indexes.GI_news_32] = log(GI_news_32Prime / GI_news_shock) - log(GI_news_33)
+F[indexes.GI_news_33] = log(GI_news_33Prime / GI_news_shock) - log(GI_news_34)
+F[indexes.GI_news_34] = log(GI_news_34Prime / GI_news_shock) - log(GI_news_35)
+F[indexes.GI_news_35] = log(GI_news_35Prime / GI_news_shock) - log(GI_news_36)
+F[indexes.GI_news_36] = log(GI_news_36Prime / GI_news_shock) - log(GI_news_37)
+F[indexes.GI_news_37] = log(GI_news_37Prime / GI_news_shock) - log(GI_news_38)
+F[indexes.GI_news_38] = log(GI_news_38Prime / GI_news_shock) - log(GI_news_39)
+# Terminal condition: program ends exactly at period 40
+F[indexes.GI_news_39] = log(GI_news_39Prime / GI_news_shock) - log(XSS[indexes.GISS])
 
-# Spending the authorized investment linearly over 40 periods
-F[indexes.Auth] = (log(AuthPrime)) - 
-    (m_par.ρ_GI * log(Auth) + (1.0 - m_par.ρ_GI) * XSS[indexes.AuthSS])
-F[indexes.Auth_lag1] = (log(Auth_lag1Prime)) - (log(Auth))
-F[indexes.Auth_lag2] = (log(Auth_lag2Prime)) - (log(Auth_lag1))
-F[indexes.Auth_lag3] = (log(Auth_lag3Prime)) - (log(Auth_lag2))
-F[indexes.Auth_lag4] = (log(Auth_lag4Prime)) - (log(Auth_lag3))
-F[indexes.Auth_lag5] = (log(Auth_lag5Prime)) - (log(Auth_lag4))
-F[indexes.Auth_lag6] = (log(Auth_lag6Prime)) - (log(Auth_lag5))
-F[indexes.Auth_lag7] = (log(Auth_lag7Prime)) - (log(Auth_lag6))
-F[indexes.Auth_lag8] = (log(Auth_lag8Prime)) - (log(Auth_lag7))
-F[indexes.Auth_lag9] = (log(Auth_lag9Prime)) - (log(Auth_lag8))
-F[indexes.Auth_lag10] = (log(Auth_lag10Prime)) - (log(Auth_lag9))
-F[indexes.Auth_lag11] = (log(Auth_lag11Prime)) - (log(Auth_lag10))
-F[indexes.Auth_lag12] = (log(Auth_lag12Prime)) - (log(Auth_lag11))
-F[indexes.Auth_lag13] = (log(Auth_lag13Prime)) - (log(Auth_lag12))
-F[indexes.Auth_lag14] = (log(Auth_lag14Prime)) - (log(Auth_lag13))
-F[indexes.Auth_lag15] = (log(Auth_lag15Prime)) - (log(Auth_lag14))
-F[indexes.Auth_lag16] = (log(Auth_lag16Prime)) - (log(Auth_lag15))
-F[indexes.Auth_lag17] = (log(Auth_lag17Prime)) - (log(Auth_lag16))
-F[indexes.Auth_lag18] = (log(Auth_lag18Prime)) - (log(Auth_lag17))
-F[indexes.Auth_lag19] = (log(Auth_lag19Prime)) - (log(Auth_lag18))
-F[indexes.Auth_lag20] = (log(Auth_lag20Prime)) - (log(Auth_lag19))
-F[indexes.Auth_lag21] = (log(Auth_lag21Prime)) - (log(Auth_lag20))
-F[indexes.Auth_lag22] = (log(Auth_lag22Prime)) - (log(Auth_lag21))
-F[indexes.Auth_lag23] = (log(Auth_lag23Prime)) - (log(Auth_lag22))
-F[indexes.Auth_lag24] = (log(Auth_lag24Prime)) - (log(Auth_lag23))
-F[indexes.Auth_lag25] = (log(Auth_lag25Prime)) - (log(Auth_lag24))
-F[indexes.Auth_lag26] = (log(Auth_lag26Prime)) - (log(Auth_lag25))
-F[indexes.Auth_lag27] = (log(Auth_lag27Prime)) - (log(Auth_lag26))
-F[indexes.Auth_lag28] = (log(Auth_lag28Prime)) - (log(Auth_lag27))
-F[indexes.Auth_lag29] = (log(Auth_lag29Prime)) - (log(Auth_lag28))
-F[indexes.Auth_lag30] = (log(Auth_lag30Prime)) - (log(Auth_lag29))
-F[indexes.Auth_lag31] = (log(Auth_lag31Prime)) - (log(Auth_lag30))
-F[indexes.Auth_lag32] = (log(Auth_lag32Prime)) - (log(Auth_lag31))
-F[indexes.Auth_lag33] = (log(Auth_lag33Prime)) - (log(Auth_lag32))
-F[indexes.Auth_lag34] = (log(Auth_lag34Prime)) - (log(Auth_lag33))
-F[indexes.Auth_lag35] = (log(Auth_lag35Prime)) - (log(Auth_lag34))
-F[indexes.Auth_lag36] = (log(Auth_lag36Prime)) - (log(Auth_lag35))
-F[indexes.Auth_lag37] = (log(Auth_lag37Prime)) - (log(Auth_lag36))
-F[indexes.Auth_lag38] = (log(Auth_lag38Prime)) - (log(Auth_lag37))
-F[indexes.Auth_lag39] = (log(Auth_lag39Prime)) - (log(Auth_lag38))
+# Current realized GI equals 1-period-ahead announcement
+F[indexes.GI] = log(GI) - log(GI_news_1)
 
 # Construction pipeline of public capital
 F[indexes.GI_lag1] = (log(GI_lag1Prime)) - (log(GI))
 F[indexes.GI_lag2] = (log(GI_lag2Prime)) - (log(GI_lag1))
 F[indexes.GI_lag3] = (log(GI_lag3Prime)) - (log(GI_lag2))
 F[indexes.GI_lag4] = (log(GI_lag4Prime)) - (log(GI_lag3))
-#F[indexes.GI_lag5] = (log(GI_lag5Prime)) - (log(GI_lag4))
-#F[indexes.GI_lag6] = (log(GI_lag6Prime)) - (log(GI_lag5))
-#F[indexes.GI_lag7] = (log(GI_lag7Prime)) - (log(GI_lag6))
-#F[indexes.GI_lag8] = (log(GI_lag8Prime)) - (log(GI_lag7))
-#F[indexes.GI_lag9] = (log(GI_lag9Prime)) - (log(GI_lag8))
-#F[indexes.GI_lag10] = (log(GI_lag10Prime)) - (log(GI_lag9))
-#F[indexes.GI_lag11] = (log(GI_lag11Prime)) - (log(GI_lag10))
-#F[indexes.GI_lag12] = (log(GI_lag12Prime)) - (log(GI_lag11))
-
-# Linear Spending Equation
-F[indexes.GI] = (log(GI)) - (log((1/40) * 
-    (Auth + Auth_lag1 + Auth_lag2 + Auth_lag3 + Auth_lag4 + 
-    Auth_lag5 + Auth_lag6 + Auth_lag7 + Auth_lag8 + Auth_lag9 + 
-    Auth_lag10 + Auth_lag11 + Auth_lag12 + Auth_lag13 + Auth_lag14 + 
-    Auth_lag15 + Auth_lag16 + Auth_lag17 + Auth_lag18 + Auth_lag19 + 
-    Auth_lag20 + Auth_lag21 + Auth_lag22 + Auth_lag23 + Auth_lag24 + 
-    Auth_lag25 + Auth_lag26 + Auth_lag27 + Auth_lag28 + Auth_lag29 + 
-    Auth_lag30 + Auth_lag31 + Auth_lag32 + Auth_lag33 + Auth_lag34 + 
-    Auth_lag35 + Auth_lag36 + Auth_lag37 + Auth_lag38 + Auth_lag39)))
-
 
 # Finished public capital
 F[indexes.KG] = (log(KGPrime)) - (log((1.0 - m_par.δ_KG) * KG + GI_lag4))

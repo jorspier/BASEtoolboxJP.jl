@@ -1,3 +1,14 @@
+### -------------------------------------------
+# Data preparation for Germany
+# Structure:
+#   1. Download and process raw data
+#   2. Convert to real values per capita
+#   3. Seasonal & calendar adjustment
+#   4. Convert to growth rates and demean
+#       - similar transformation as in BBL or Smets & Wouters (2007)
+#   5. Compute averages for targets/ calibration
+### -------------------------------------------
+
 library(rdbnomics)
 library(dplyr)
 library(tidyr)
@@ -5,19 +16,10 @@ library(lubridate)
 library(RJDemetra)
 library(readr)
 library(wid)
+library(rvest)
 
-### ---------- Download raw data ------------
-## GDP (chain linked values 2020; season & calendar adjusted)
-# gdp_agg <- rdb(ids = "Eurostat/namq_10_gdp/Q.CLV20_MEUR.SCA.B1GQ.DE")
-
-# gdp_agg <- gdp_agg %>%
-#     rename(gdp = value) %>%
-#     select(period, gdp) %>%
-#     mutate(gdp = gdp * 1e6) # from million to euro
-
+### ---------- 1. Download raw data ------------
 ## Government Consumption
-# (real) cons_gov_agg <- rdb(ids = "Eurostat/namq_10_gdp/Q.CLV20_MEUR.SCA.P3_S13.DE")
-
 # current prices in million euro, season & calendar adjusted
 cons_gov_nom <- rdb(ids = "Eurostat/namq_10_gdp/Q.CP_MEUR.SCA.P3_S13.DE")
 
@@ -27,8 +29,6 @@ cons_gov_nom <- cons_gov_nom %>%
     mutate(cons_gov = cons_gov * 1e6) # from million to euro
 
 ## Private Consumption (HH & non-profits)
-# (real) cons_priv_agg <- rdb(ids = "Eurostat/namq_10_gdp/Q.CLV20_MEUR.SCA.P31_S14_S15.DE")
-
 cons_priv_nom <- rdb(ids = "Eurostat/namq_10_gdp/Q.CP_MEUR.SCA.P31_S14_S15.DE")
 
 cons_priv_nom <- cons_priv_nom %>%
@@ -94,7 +94,7 @@ deflator_raw <- rdb(ids = "Eurostat/namq_10_gdp/Q.PD20_EUR.SCA.B1GQ.DE")
 
 deflator_raw <- deflator_raw %>%
     rename(deflator = value) %>%
-    select(period, deflator) 
+    select(period, deflator)
 
 ## Interest Rate 
 #3 months EURIBOR (only from 1994)
@@ -136,12 +136,9 @@ T10Ishare <- download_wid(indicator = "sptinc",
                             select(year, value) %>%
                             rename(T10Ishare = value)
 
-# convert to quarterly structure with same value for all quarters in a year
+# Convert year to date format (required for merging with other datasets)
 T10Ishare <- T10Ishare %>%
     mutate(year = as.Date(paste0(year, "-01-01"))) %>%
-    # complete(year = seq.Date(as.Date("1991-01-01"), as.Date("2025-10-01"), by = "quarter")) %>%
-    # fill(T10Ishare, .direction = "down") %>%
-    # fill(T10Ishare, .direction = "up") %>%
     rename(period = year)
 
 ## Top 10% wealth share
@@ -156,13 +153,53 @@ T10Wshare <- download_wid(indicator = "shweal",
 
 T10Wshare <- T10Wshare %>%
     mutate(year = as.Date(paste0(year, "-01-01"))) %>%
-    # complete(year = seq.Date(as.Date("1991-01-01"), as.Date("2025-10-01"), by = "quarter")) %>%
-    # fill(T10Wshare, .direction = "down") %>%
-    # fill(T10Wshare, .direction = "up") %>%
+    rename(period = year)
+
+## Income Gini
+# Pre-tax income
+GiniGrossInc <- download_wid(indicator = "gptinc", 
+                            perc = "p0p100",
+                            areas = "DE", 
+                            pop = "j", 
+                            ages = "992") %>%
+                            filter(year >= 1991) %>%
+                            select(year, value) %>%
+                            rename(GiniGrossInc = value)
+
+GiniGrossInc <- GiniGrossInc %>%
+    mutate(year = as.Date(paste0(year, "-01-01"))) %>%
+    rename(period = year)
+
+# Post-tax income
+GiniNetInc <- download_wid(indicator = "gdiinc",
+                            perc = "p0p100", # Gini for total distribution
+                            areas = "DE", 
+                            pop = "j", 
+                            ages = "992") %>%
+                            filter(year >= 1991) %>%
+                            select(year, value) %>%
+                            rename(GiniNetInc = value)
+
+GiniNetInc <- GiniNetInc %>%
+    mutate(year = as.Date(paste0(year, "-01-01"))) %>%
+    rename(period = year)
+
+## Wealth Gini
+GiniWealth <- download_wid(indicator = "ghweal",
+                            perc = "p0p100", # Gini for total distribution
+                            areas = "DE", 
+                            pop = "j", # equal split adults
+                            ages = "992") %>%
+                            filter(year >= 1991) %>%
+                            select(year, value) %>%
+                            rename(GiniWealth = value)
+
+GiniWealth <- GiniWealth %>%
+    mutate(year = as.Date(paste0(year, "-01-01"))) %>%
     rename(period = year)
 
 
-### --------- Real values ------------
+### --------- 2. Real values ------------
 ## Merge dataset
 master <- gdp_nom %>%
     left_join(cons_gov_nom, by = "period") %>%
@@ -175,6 +212,9 @@ master <- gdp_nom %>%
     left_join(deflator_raw, by = "period") %>%
     left_join(T10Ishare, by = "period") %>%
     left_join(T10Wshare, by = "period") %>%
+    left_join(GiniGrossInc, by = "period") %>%
+    left_join(GiniNetInc, by = "period") %>%
+    left_join(GiniWealth, by = "period") %>%
     left_join(pop, by = "period")
 
 master_real <- master %>%
@@ -182,7 +222,8 @@ master_real <- master %>%
         , ~ .x / (deflator / 100))) %>%
     mutate(wages = (wages / hours) / (deflator / 100)) %>%
     select(period, gdp, cons_gov, cons_priv, inv_gov, inv_priv, 
-        wages, hours, interest, population, deflator, T10Ishare, T10Wshare)
+        wages, hours, interest, population, deflator, T10Ishare, 
+        T10Wshare, GiniGrossInc, GiniNetInc, GiniWealth)
 
 
 ### ---------- Seasonal & calendar adjustment ------------
@@ -246,7 +287,7 @@ master_pc <- master_real %>%
         hours_pc = hours
     )
 
-## Adjusting into growth rates
+## ------- 4. Adjusting into growth rates ------
 master_growth <- master_pc %>%
     mutate(
         Ygrowth  = (log(gdp_pc)       - lag(log(gdp_pc))),
@@ -259,9 +300,13 @@ master_growth <- master_pc %>%
         pi       = log(deflator)      - lag(log(deflator)),
         RB       = interest / 4,
         TOP10Ishare = log(T10Ishare),
-        TOP10Wshare = log(T10Wshare)
+        TOP10Wshare = log(T10Wshare),
+        GiniGrossInc = log(GiniGrossInc),
+        GiniNetInc  = log(GiniNetInc),
+        GiniWealth  = log(GiniWealth)
     ) %>%
-    select(period, Ygrowth, GCgrowth, Cgrowth, GIgrowth, Igrowth, wgrowth, N, pi, RB, TOP10Ishare, TOP10Wshare)
+    select(period, Ygrowth, GCgrowth, Cgrowth, GIgrowth, Igrowth, 
+        wgrowth, N, pi, RB, TOP10Ishare, TOP10Wshare, GiniGrossInc, GiniNetInc, GiniWealth)
 
 ## Compte TS averages
 master_growth_avg <- master_growth %>%
@@ -276,7 +321,10 @@ master_growth_avg <- master_growth %>%
         pi_avg      = mean(pi, na.rm = TRUE),
         RB_avg      = mean(RB, na.rm = TRUE),
         TOP10Ishare_avg = mean(TOP10Ishare, na.rm = TRUE),
-        TOP10Wshare_avg = mean(TOP10Wshare, na.rm = TRUE)
+        TOP10Wshare_avg = mean(TOP10Wshare, na.rm = TRUE),
+        GiniGrossInc_avg = mean(GiniGrossInc, na.rm = TRUE),
+        GiniNetInc_avg = mean(GiniNetInc, na.rm = TRUE),
+        GiniWealth_avg = mean(GiniWealth, na.rm = TRUE)
     )
 
 master_growth_stationary <- master_growth %>%
@@ -291,24 +339,88 @@ master_growth_stationary <- master_growth %>%
         pi      = pi - master_growth_avg$pi_avg,
         RB      = RB - master_growth_avg$RB_avg,
         TOP10Ishare = TOP10Ishare - master_growth_avg$TOP10Ishare_avg,
-        TOP10Wshare = TOP10Wshare - master_growth_avg$TOP10Wshare_avg
+        TOP10Wshare = TOP10Wshare - master_growth_avg$TOP10Wshare_avg,
+        GiniGrossInc = GiniGrossInc - master_growth_avg$GiniGrossInc_avg,
+        GiniNetInc  = GiniNetInc - master_growth_avg$GiniNetInc_avg,
+        GiniWealth  = GiniWealth - master_growth_avg$GiniWealth_avg
     ) %>%
-    select(period, Ygrowth, GCgrowth, Cgrowth, GIgrowth, Igrowth, wgrowth, N, pi, RB, TOP10Ishare, TOP10Wshare)
+    select(period, Ygrowth, GCgrowth, Cgrowth, GIgrowth, Igrowth, wgrowth, 
+        N, pi, RB, TOP10Ishare, TOP10Wshare, GiniGrossInc, GiniNetInc, GiniWealth)
 
-## Report important averages
+
+# save as csv
+write_csv(master_growth_stationary, "examples/baseline_TTB_10Y/Data/GER_growth.csv", na = "NaN")
+
+
+### ----- 5. Retrieve averages for targets/ calibration -----
 # Top 10% shares
 T10Iavg <- mean(master_pc$T10Ishare, na.rm = TRUE)
 T10Wavg <- mean(master_pc$T10Wshare, na.rm = TRUE)
+
+# Income and wealth inequality (Gini)
+GiniGrossInc_avg <- mean(master_pc$GiniGrossInc, na.rm = TRUE)
+GiniNetInc_avg <- mean(master_pc$GiniNetInc, na.rm = TRUE)
+GiniWealth_avg <- mean(master_pc$GiniWealth, na.rm = TRUE)
 
 # Government spending shares
 GCshare_avg <- mean(master_pc$cons_gov_pc / master_pc$gdp_pc, na.rm = TRUE)
 GIshare_avg <- mean(master_pc$inv_gov_pc / master_pc$gdp_pc, na.rm = TRUE)
 
-## Tax progrssivity P = (AMTR - ATR)/(1 - ATR)
+# Interest rate
+RB_avg <- mean(master_growth$RB, na.rm = TRUE)
 
+## Liquid to illiquid asset ratio
+evs_url <- "https://www.destatis.de/EN/Themes/Society-Environment/Income-Consumption-Living-Conditions/Assets-Debts/Tables/financial-assets-debt-evs.html"
+evs_raw <- read_html(evs_url) %>%
+    html_table(fill = TRUE) %>%
+    .[[1]]
+# Columns 2–5 are Germany (2008, 2013, 2018, 2023); col 1 is the row label
+evs_ger <- evs_raw[, 1:5]
+evs_ger <- evs_ger[-c(1,2),]
 
-# Income risk
+names(evs_ger) <- c("category", "2008", "2013", "2018", "2023")
 
+#clean_num <- function(x) as.numeric(gsub("[^0-9]", "", x)) # remove thousands numerator
 
-# save as csv
-write_csv(master_growth_stationary, "examples/baseline_TTB_10Y/Data/GER_growth.csv", na = "NaN")
+evs_ger <- evs_ger %>%
+    mutate(
+    across(
+      c(`2008`, `2013`, `2018`, `2023`),
+      ~ parse_number(.)
+    ))
+
+# Matching the modelin strategy, I use NET financial assets
+#   & GROSS illiquid assets (current market values) since there are no mortgages
+# Note: only 4 data points with strong linear trend 
+
+net_fin  <- evs_ger %>% 
+    filter(grepl("Net financial assets", category)) %>% 
+    select(-category)
+curr_mkt <- evs_ger %>% 
+    filter(grepl("Current market values", category)) %>% 
+    select(-category)
+
+evs_ger <- evs_ger %>%
+    bind_rows(bind_cols(category = "Asset ratio", net_fin / curr_mkt))
+
+BK_avg <- mean(as.numeric(evs_ger[10, 2:5]))
+
+## Debt to GDP (1995-2024)
+BgovY <- rdb(ids = "Eurostat/gov_10dd_edpt1/A.PC_GDP.S13.GD.DE")
+
+BgovY <- BgovY %>%
+    select(period, value)
+
+BgovY_avg = mean(BgovY$value, na.rm = TRUE)
+
+# Write averages as table
+averages_table <- data.frame(
+    Metric = c("Top 10% Income Share", "Top 10% Wealth Share", 
+               "Gini Gross Income", "Gini Net Income", "Gini Wealth",
+               "Government Consumption Share", "Government Investment Share",
+               "Real Interest Rate", "Asset ratio", "Debt-to-GDP"),
+    Average = c(T10Iavg, T10Wavg, GiniGrossInc_avg, GiniNetInc_avg, GiniWealth_avg,
+                GCshare_avg, GIshare_avg, RB_avg, BK_avg, BgovY_avg)
+)
+
+print(averages_table)

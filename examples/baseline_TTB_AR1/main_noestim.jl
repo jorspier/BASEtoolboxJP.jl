@@ -38,76 +38,74 @@ BASEforHANK.LinearAlgebra.BLAS.set_num_threads(Threads.nthreads());
 
 m_par = ModelParameters();
 
-@set! m_par.ξ = 4.0;
-@set! m_par.γ = 2.0;
-@set! m_par.β = 0.9828470527212994; # 0.98255;
-@set! m_par.λ = 0.06038247534019993; # 0.065;
-@set! m_par.ρ_h = 0.98;
-@set! m_par.σ_h = 0.12;
-@set! m_par.ι = 0.0625;
-@set! m_par.ζ = 0.000258606126756716; # 0.00022222222222222223;
-@set! m_par.α = 0.318;
-@set! m_par.δ_0 = 0.021500000000000002;
-@set! m_par.δ_s = 0.7055720197078786;
-@set! m_par.ϕ = 1.9409223183717077;
-@set! m_par.μ = 1.1;
-@set! m_par.κ = 0.1456082664986374;
-@set! m_par.μw = 1.1;
-@set! m_par.κw = 0.23931075416274708;
-@set! m_par.Tlev = 1.2596633554411527; # 1.0 + (1 - 0.8225);
-@set! m_par.Tprog = 1.0 + 0.1022;
-@set! m_par.Tc = 1.0;
-@set! m_par.Tk = 1.0;
-@set! m_par.Ttr_1 = 1.0;
-@set! m_par.Ttr_2 = 1.0;
-@set! m_par.RRB = 1.0;
-@set! m_par.Rbar = 0.024276573587297953; # 0.021778180864641117;
-@set! m_par.ωΠ = 0.2;
-@set! m_par.ιΠ = 0.016;
-@set! m_par.shiftΠ = 0.7002848330469671;
-@set! m_par.ρ_A = 0.9724112284399131;
-@set! m_par.σ_A = 0.0015812471705012755;
-@set! m_par.ρ_ZI = 0.7637111671257767;
-@set! m_par.σ_ZI = 0.0721141538701523;
-@set! m_par.ρ_μ = 0.903740078830077;
-@set! m_par.σ_μ = 0.01350860622318172;
-@set! m_par.ρ_μw = 0.9057892147641305;
-@set! m_par.σ_μw = 0.035058308969408175;
-@set! m_par.ρ_s = 0.544722245741144;
-@set! m_par.σ_Sshock = 0.6918558038597916;
-@set! m_par.Σ_n = 28.879770107327673;
-@set! m_par.ρ_R = 0.8030565250630299;
-@set! m_par.σ_Rshock = 0.002306627917745612;
-@set! m_par.θ_π = 2.0780841671981856;
-@set! m_par.θ_Y = 0.21872568927661648;
-@set! m_par.γ_B = 0.020131162775595176;
-@set! m_par.γ_π = -2.1737350397931947;
-@set! m_par.γ_Y = -0.4363130165391906;
-@set! m_par.ρ_Gshock = 0.9682224473297878;
-@set! m_par.σ_Gshock = 0.003761816459554433;
-@set! m_par.ρ_τ = 0.4926482696848203;
-@set! m_par.γ_Bτ = 3.293063617271948;
-@set! m_par.γ_Yτ = -0.9207283604196101;
-@set! m_par.ρ_P = 0.9194235885358465;
-@set! m_par.σ_Tprogshock = 0.06865440038519788;
-@set! m_par.γ_BP = 0.0;
-@set! m_par.γ_YP = 0.0;
-@set! m_par.γ_WP = 0.0;
-@set! m_par.ρ_Rshock = 1.0e-8;
-@set! m_par.ρ_Tprogshock = 1.0e-8;
-@set! m_par.ρ_Sshock = 1.0e-8;
-@set! m_par.ρ_TFP = 0.9978155269262137;     
-@set! m_par.σ_TFP = 0.00600947811158941; 
+# @set! m_par.ξ = 4.0;
+# @set! m_par.γ = 2.0;
+# @set! m_par.β = 0.991673574071822;
+# @set! m_par.λ = 0.02234890580840817; 
+# @set! m_par.ρ_h = 0.9815;
+# @set! m_par.σ_h = 0.135;
+# @set! m_par.ι = 0.0625;
+# @set! m_par.ζ = 0.0005; 
+# @set! m_par.α = 0.32;
+# @set! m_par.δ_0 = 0.015;
+# @set! m_par.δ_s = 0.7180368636852436;
+# @set! m_par.ϕ = 1.966794427917757;
+# @set! m_par.μ = 1.05;
+# @set! m_par.κ = 0.1479251925067033;
+# @set! m_par.μw = 1.05;
+# @set! m_par.κw = 0.24550729545132235;
+# @set! m_par.Tlev = 1.0 + 0.1225298495374623756;
+# @set! m_par.Tprog = 1.0 + 0.2;
+# @set! m_par.Tc = 1.0;
+# @set! m_par.Tk = 1.0;
+# @set! m_par.Ttr_1 = 1.55;
+# @set! m_par.Ttr_2 = 1.8;
+# @set! m_par.RRB = 1.0;
+# @set! m_par.Rbar = 0.036798968157815665;
+# @set! m_par.ωΠ = 0.2;
+# @set! m_par.ιΠ = 0.016;
+# @set! m_par.shiftΠ = 0.7138438278245689;
+# @set! m_par.ρ_A = 0.9998728292904844;
+# @set! m_par.σ_A = 0.0023446421723594727;
+# @set! m_par.ρ_ZI = 0.7618447236808487;
+# @set! m_par.σ_ZI = 0.07436546031946978;
+# @set! m_par.ρ_μ = 0.9733829673391314;
+# @set! m_par.σ_μ = 0.014809661702069623;
+# @set! m_par.ρ_μw = 0.9110208706720851;
+# @set! m_par.σ_μw = 0.036870468298782905;
+# @set! m_par.ρ_s = 0.5559631986300858;
+# @set! m_par.σ_Sshock = 0.6918558038597916; # 0.0
+# @set! m_par.Σ_n = 28.879770107327673; # 0.0
+# @set! m_par.ρ_R = 0.8238297433452639;
+# @set! m_par.σ_Rshock = 0.0031182372723710205;
+# @set! m_par.θ_π = 1.25;
+# @set! m_par.θ_Y = 0.0;
+# @set! m_par.γ_B = 0.1;
+# @set! m_par.γ_π = -2.1989682009232125;
+# @set! m_par.γ_Y = -0.4417816197316064;
+# @set! m_par.ρ_Gshock = 0.9986388882841384;
+# @set! m_par.σ_Gshock = 0.01; # 0.004712013201311698;
+# @set! m_par.ρ_τ = 0.5052588859076916;
+# @set! m_par.γ_Bτ = 0.0;
+# @set! m_par.γ_Yτ = -0.9430455116131855;
+# @set! m_par.ρ_P = 0.9410326697915214;
+# @set! m_par.σ_Tprogshock = 0.0;
+# @set! m_par.γ_BP = 0.0;
+# @set! m_par.γ_YP = 0.0;
+# @set! m_par.γ_WP = 0.0;
+# @set! m_par.ρ_Rshock = 1.0e-8;
+# @set! m_par.ρ_Tprogshock = 1.0e-8;
+# @set! m_par.ρ_Sshock = 1.0e-8;
+# @set! m_par.ρ_TFP = 0.5045353093162687;     
+# @set! m_par.σ_TFP = 0.025251212935269763; 
 
-# new govt investment parameters
-@set! m_par.γ_GI = 1.0;                     # Deficit reaction to GI (0 = tax financed, 1 = debt)
-@set! m_par.GI_share = 0.03;                # Steady state share of govt investment
-@set! m_par.ϕ_GI = 1/40;                    # Pipeline efficiency (1/4 builds per quarter)
-@set! m_par.δ_KG = 0.04;                    # Depreciation of public capital
-@set! m_par.η_KG = 0.05;                    # Elasticity of output w.r.t public capital
-@set! m_par.ρ_GI = 0.95;                    # Persistence of GI shock
-@set! m_par.σ_GI = m_par.σ_Gshock * ((1.0 - m_par.ρ_GI) / (1.0 - m_par.ρ_Gshock)) * (0.17 / m_par.GI_share) # Scaled to match consumption shock
-   
+# # new govt investment parameters
+# @set! m_par.γ_GI = 1.0;                    # Deficit reaction to GI (0 = tax financed, 1 = debt)
+# @set! m_par.GI_share = 0.028;              # Steady state share of govt investment
+# @set! m_par.δ_KG = 0.01;                   # Depreciation of public capital
+# @set! m_par.η_KG = 0.1;                    # Elasticity of output w.r.t public capital
+# @set! m_par.ρ_GI = 0.5209852270953002;     # Spending is announced once; persistence originates from TTB
+# @set! m_par.σ_GI = 0.01; # 0.005158611558252573 
 
 
 ## ------------------------------------------------------------------------------------------
@@ -128,10 +126,7 @@ Y = exp.(sr_full.XSS[sr_full.indexes.YSS]);
 T10W = exp(sr_full.XSS[sr_full.indexes.TOP10WshareSS]);
 G = exp.(sr_full.XSS[sr_full.indexes.GSS]);
 fr_borr = BASEforHANK.eval_cdf(sr_full.distrSS, :b, sr_full.n_par, 0.0);
-# new 
-GI = exp.(sr_full.XSS[sr_full.indexes.GISS]);
 KG = exp.(sr_full.XSS[sr_full.indexes.KGSS]);
-#Sp = exp.(sr_full.XSS[sr_full.indexes.SpSS]);
 
 # Display steady state moments
 @printf "\n"
@@ -143,7 +138,6 @@ pretty_table(
         "Private Capital to Output Ratio" K / Y/4.0
         "Government Debt to Output Ratio" Bgov / Y/4.0
         "Government Spending to Output Ratio" G/Y
-        "Government Investment to Output Ratio" GI/Y
         "Public Capital to Output Ratio" KG/Y/4.0
     ];
     header = ["Variable", "Value"],
@@ -188,9 +182,18 @@ IRFs, _, IRFs_order = compute_irfs( # , IRFs_dist
     m_par = sr_full.m_par,
 );
 
-# export IRFs
-@save joinpath(paths["bld"], "baseline_TTB_AR1_noestim", "IRFs_frontloaded.jld2") IRFs IRFs_order indexes=sr_full.indexes
-
+# Export IRFs
+idx_dict_hank_AR1 = Dict{Symbol, Int}(
+    name => getfield(sr_full.indexes, name) 
+    for name in fieldnames(typeof(sr_full.indexes)) 
+    if getfield(sr_full.indexes, name) isa Int
+)
+jldsave(paths["bld_example"] * "/IRFs_HANK_AR1.jld2", true; 
+    IRFs, 
+    IRFs_order, 
+    IRFs_dist,
+    idx_dict_hank_AR1
+)
 # Compute variance decomposition of IRFs
 VDs = compute_vardecomp(IRFs);
 

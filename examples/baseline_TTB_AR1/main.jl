@@ -3,7 +3,7 @@ Mainboard for the baseline example of the BASEforHANK package.
 """
 global_start_time = time()
 
-using PrettyTables, Printf, BenchmarkTools;
+using PrettyTables, Printf, BenchmarkTools, LinearAlgebra;
 
 ## ------------------------------------------------------------------------------------------
 ## Header: set up paths, pre-process user inputs, load module
@@ -47,7 +47,7 @@ e_set = BASEforHANK.e_set;
 @set! e_set.save_mode_file = paths["bld_example"] * "/HANK_mode.jld2";
 @set! e_set.save_posterior_file = paths["bld_example"] * "/HANK_chain.jld2";
 @set! e_set.mode_start_file = paths["src_example"] * "/Data/par_final_dict.txt";
-@set! e_set.data_file = paths["src_example"] * "/Data/bbl_data_inequality.csv";
+@set! e_set.data_file = paths["src_example"] * "/Data/GER_growth.csv";
 
 # fix seed for random number generation
 BASEforHANK.Random.seed!(e_set.seed);
@@ -57,10 +57,10 @@ BASEforHANK.Random.seed!(e_set.seed);
 ## ------------------------------------------------------------------------------------------
 
 # steady state at the prior mode
-ss_full = call_find_steadystate(m_par);
+@time ss_full = call_find_steadystate(m_par);
 
 # sparse DCT representation
-sr_full = call_prepare_linearization(ss_full, m_par);
+@time sr_full = call_prepare_linearization(ss_full, m_par);
 
 # save the steady state
 jldsave(paths["bld_example"] * "/steadystate.jld2", true; sr_full);
@@ -72,7 +72,6 @@ Bgov = exp.(sr_full.XSS[sr_full.indexes.BgovSS]);
 Y = exp.(sr_full.XSS[sr_full.indexes.YSS]);
 T10W = exp(sr_full.XSS[sr_full.indexes.TOP10WshareSS]);
 G = exp.(sr_full.XSS[sr_full.indexes.GSS]);
-GI = exp.(sr_full.XSS[sr_full.indexes.GISS]);
 fr_borr = BASEforHANK.eval_cdf(sr_full.distrSS, :b, sr_full.n_par, 0.0);
 
 # Display steady state moments
@@ -83,7 +82,6 @@ pretty_table(
         "Capital to Output Ratio" K / Y/4.0
         "Government Debt to Output Ratio" Bgov / Y/4.0
         "Government Spending to Output Ratio" G/Y
-        "Government Investment to Output Ratio" GI/Y
         "TOP 10 Wealth Share" T10W
         "Fraction of Borrower" fr_borr
     ];
@@ -103,24 +101,6 @@ jldsave(paths["bld_example"] * "/linearresults.jld2", true; lr_full);
 # sparse state-space representation
 sr_reduc = model_reduction(sr_full, lr_full, m_par);
 lr_reduc = update_model(sr_reduc, lr_full, m_par);
-
-# Eigenvalue diagnostics
-using LinearAlgebra
-eigenvals = eigvals(n_par.nstates_r)
-eigenvals_sorted = sort(abs.(eigenvals), rev=true)
-
-@printf "\n=== State Space Check ===\n"
-@printf "Number of states: %d (expected: 267)\n" size(n_par.nstates_r, 1)
-
-@printf "\nTop 15 eigenvalues:\n"
-for i in 1:min(15, length(eigenvals_sorted))
-    @printf "  %2d: %.10f" i eigenvals_sorted[i]
-    if i < length(eigenvals_sorted) && abs(eigenvals_sorted[i] - eigenvals_sorted[i+1]) < 1e-8
-        @printf "  ← DUPLICATE"
-    end
-    @printf "\n"
-end
-@printf "\n"
 
 # save the reduction
 jldsave(paths["bld_example"] * "/reduction.jld2", true; sr_reduc, lr_reduc);
@@ -142,6 +122,13 @@ if e_set.estimate_model == true
     # warning: estimation might take a long time!
     er_mode, posterior_mode, smoother_mode, sr_mode, lr_mode, m_par_mode =
         find_mode(sr_reduc, lr_reduc, m_par, e_set)
+
+    # Adjust starting values for MCMC sampling to proportional 1% steps
+    hank_start_vals = er_mode.par_final
+    step_sizes = (abs.(hank_start_vals) .* 0.01) .+ 1e-4
+    variances = step_sizes .^ 2
+    hessian_diag = 1.0 ./ variances # Invert to create the Hessian and inject it into er_mode
+    @set! er_mode.hessian_final = Matrix(Diagonal(hessian_diag))
 
     # Only relevant output for later plotting will be saved.
     # If you require all smoother output including the variance estimates
@@ -261,36 +248,48 @@ ShockContr, ShockContr_order = compute_hist_decomp(
 @printf "\n"
 @printf "Plotting...\n"
 
+horizon = 80
+shocks_to_plot = [
+    #(:TFP, "TFP"),
+    #(:ZI, "Inv.-spec. tech."),
+    #(:μ, "Price markup"),
+    #(:μw, "Wage markup"),
+    #(:A, "Risk premium"),
+    #(:Rshock, "Mon. policy"),
+    (:Gshock, "Structural deficit"),
+    (:GI, "Gov. Investment shock"),
+    #(:Tprogshock, "Tax progr."),
+    #(:Sshock, "Income risk"),
+    ]
+vars_to_plot = [
+    (:Y, "Output"), # removed growth
+    (:C, "Consumption"),
+    (:Bgov, "Gov. Debt"),
+    (:KG, "Public Capital"),    
+    (:K, "Private Capital"),
+    (:I, "Investment"),
+    (:N, "Employment"),
+    (:wF, "Wage"),
+    (:π, "Inflation"),
+    (:RB, "Nominal rate"),
+    (:RRL, "Return on Bonds"),
+    (:RK, "Return on Capital"),
+    (:LPXA, "Ex-ante Liquidity Premium"),
+    (:LP, "Ex-post Liquidity Premium"),
+    #(:σ, "Income risk"),
+    #(:Tprog, "Tax progressivity"),
+    #(:TOP10Wshare, "Top 10 wealth share"),
+    #(:TOP10Ishare, "Top 10 gross inc. share"),
+    #(:TOP10Inetshare, "Top 10 net inc. share"),
+    (:GiniW, "Wealth Gini"),
+    (:GiniC, "Consumption Gini")
+    ]
+
+
 mkpath(paths["bld_example"] * "/IRFs");
 plot_irfs(
-    [
-        (:TFP, "TFP"),
-        (:ZI, "Inv.-spec. tech."),
-        (:μ, "Price markup"),
-        (:μw, "Wage markup"),
-        (:A, "Risk premium"),
-        (:Rshock, "Mon. policy"),
-        (:Gshock, "Structural deficit"),
-        (:GI, "Gov. Investment shock"),
-        (:Tprogshock, "Tax progr."),
-        (:Sshock, "Income risk"),
-    ],
-    [
-        (:Ygrowth, "Output growth"),
-        (:Cgrowth, "Consumption growth"),
-        (:Igrowth, "Investment growth"),
-        (:N, "Employment"),
-        (:wgrowth, "Wage growth"),
-        (:RB, "Nominal rate"),
-        (:π, "Inflation"),
-        (:σ, "Income risk"),
-        #(:GI, "Gov. Investment"),
-        (:Sp, "Public capital in construction"),
-        (:KG, "Finished public capital"),
-        (:Tprog, "Tax progressivity"),
-        (:TOP10Wshare, "Top 10 wealth share"),
-        (:TOP10Ishare, "Top 10 inc. share"),
-    ],
+    shocks_to_plot,
+    vars_to_plot,
     [(IRFs_mc, "Posterior mean"), (IRFs_mode, "Mode")],
     IRFs_order,
     sr_mc.indexes_r;
@@ -305,25 +304,10 @@ mkpath(paths["bld_example"] * "/IRFs_cat");
 plot_irfs_cat(
     Dict(
         ("Monetary", "mon") => [:Rshock, :A],
-        ("Fiscal", "fis") => [:Gshock, :Tprogshock, :GI],
+        ("Fiscal", "fis") => [:Gshock, :GI], # :Tprogshock,
         ("Productivity", "pro") => [:TFP, :ZI, :μ, :μw],
     ),
-    [
-        (:Ygrowth, "Output growth"),
-        (:Cgrowth, "Consumption growth"),
-        (:Igrowth, "Investment growth"),
-        (:N, "Employment"),
-        (:wgrowth, "Wage growth"),
-        (:RB, "Nominal rate"),
-        (:π, "Inflation"),
-        (:σ, "Income risk"),
-        #(:GI, "Gov. Investment"),
-        (:Sp, "Public capital in construction"),
-        (:KG, "Finished public capital"),
-        (:Tprog, "Tax progressivity"),
-        (:TOP10Wshare, "Top 10 wealth share"),
-        (:TOP10Ishare, "Top 10 inc. share"),
-    ],
+    vars_to_plot,
     IRFs_mc,
     IRFs_order,
     sr_mc.indexes_r;
@@ -336,22 +320,7 @@ plot_irfs_cat(
 
 mkpath(paths["bld_example"] * "/VDs");
 plot_vardecomp(
-    [
-        (:Ygrowth, "Output growth"),
-        (:Cgrowth, "Consumption growth"),
-        (:Igrowth, "Investment growth"),
-        (:N, "Employment"),
-        (:wgrowth, "Wage growth"),
-        (:RB, "Nominal rate"),
-        (:π, "Inflation"),
-        (:σ, "Income risk"),
-        #(:GI, "Gov. Investment"),
-        (:Sp, "Public capital in construction"),
-        (:KG, "Finished public capital"),
-        (:Tprog, "Tax progressivity"),
-        (:TOP10Wshare, "Top 10 wealth share"),
-        (:TOP10Ishare, "Top 10 inc. share"),
-    ],
+    vars_to_plot,
     [(VDs_mc, "Posterior mean"), (VDs_mode, "Mode")],
     IRFs_order,
     sr_mc.indexes_r;
@@ -362,28 +331,13 @@ plot_vardecomp(
 
 mkpath(paths["bld_example"] * "/VDs_cat");
 plot_vardecomp(
-    [
-        (:Ygrowth, "Output growth"),
-        (:Cgrowth, "Consumption growth"),
-        (:Igrowth, "Investment growth"),
-        (:N, "Employment"),
-        (:wgrowth, "Wage growth"),
-        (:RB, "Nominal rate"),
-        (:π, "Inflation"),
-        (:σ, "Income risk"),
-        #(:GI, "Gov. Investment"),
-        (:Sp, "Public capital in construction"),
-        (:KG, "Finished public capital"),
-        (:Tprog, "Tax progressivity"),
-        (:TOP10Wshare, "Top 10 wealth share"),
-        (:TOP10Ishare, "Top 10 inc. share"),
-    ],
+    vars_to_plot,
     [(VDs_mc, "Posterior mean"), (VDs_mode, "Mode")],
     IRFs_order,
     sr_mc.indexes_r;
     shock_categories = Dict(
         ("Monetary", "mon") => [:Rshock, :A],
-        ("Fiscal", "fis") => [:Gshock, :Tprogshock, :GI],
+        ("Fiscal", "fis") => [:Gshock, :GI], # :Tprogshock,
         ("Productivity", "pro") => [:TFP, :ZI, :μ, :μw],
     ),
     show_fig = false,
@@ -393,22 +347,7 @@ plot_vardecomp(
 
 mkpath(paths["bld_example"] * "/VDbcs");
 plot_vardecomp_bcfreq(
-    [
-        (:Ygrowth, "Output growth"),
-        (:Cgrowth, "Consumption growth"),
-        (:Igrowth, "Investment growth"),
-        (:N, "Employment"),
-        (:wgrowth, "Wage growth"),
-        (:RB, "Nominal rate"),
-        (:π, "Inflation"),
-        (:σ, "Income risk"),
-        #(:GI, "Gov. Investment"),
-        (:Sp, "Public capital in construction"),
-        (:KG, "Finished public capital"),
-        (:Tprog, "Tax progressivity"),
-        (:TOP10Wshare, "Top 10 wealth share"),
-        (:TOP10Ishare, "Top 10 inc. share"),
-    ],
+    vars_to_plot,
     [(VDbcs_mc, "Posterior mean"), (VDbcs_mode, "Mode")],
     IRFs_order,
     sr_mc.indexes_r;
@@ -419,28 +358,13 @@ plot_vardecomp_bcfreq(
 
 mkpath(paths["bld_example"] * "/VDbcs_cat");
 plot_vardecomp_bcfreq(
-    [
-        (:Ygrowth, "Output growth"),
-        (:Cgrowth, "Consumption growth"),
-        (:Igrowth, "Investment growth"),
-        (:N, "Employment"),
-        (:wgrowth, "Wage growth"),
-        (:RB, "Nominal rate"),
-        (:π, "Inflation"),
-        (:σ, "Income risk"),
-        #(:GI, "Gov. Investment"),
-        (:Sp, "Public capital in construction"),
-        (:KG, "Finished public capital"),
-        (:Tprog, "Tax progressivity"),
-        (:TOP10Wshare, "Top 10 wealth share"),
-        (:TOP10Ishare, "Top 10 inc. share"),
-    ],
+    vars_to_plot,
     [(VDbcs_mc, "Posterior mean"), (VDbcs_mode, "Mode")],
     IRFs_order,
     sr_mc.indexes_r;
     shock_categories = Dict(
         ("Monetary", "mon") => [:Rshock, :A],
-        ("Fiscal", "fis") => [:Gshock, :Tprogshock, :GI],
+        ("Fiscal", "fis") => [:Gshock, :GI], # :Tprogshock,
         ("Productivity", "pro") => [:TFP, :ZI, :μ, :μw],
     ),
     show_fig = false,
@@ -450,26 +374,11 @@ plot_vardecomp_bcfreq(
 
 mkpath(paths["bld_example"] * "/HDs");
 plot_hist_decomp(
-    [
-        (:Ygrowth, "Output growth"),
-        (:Cgrowth, "Consumption growth"),
-        (:Igrowth, "Investment growth"),
-        (:N, "Employment"),
-        (:wgrowth, "Wage growth"),
-        (:RB, "Nominal rate"),
-        (:π, "Inflation"),
-        (:σ, "Income risk"),
-        #(:GI, "Gov. Investment"),
-        (:Sp, "Public capital in construction"),
-        (:KG, "Finished public capital"),
-        (:Tprog, "Tax progressivity"),
-        (:TOP10Wshare, "Top 10 wealth share"),
-        (:TOP10Ishare, "Top 10 inc. share"),
-    ],
+    vars_to_plot,
     ShockContr,
     ShockContr_order,
     sr_mc.indexes_r;
-    timeline = collect(1954.75:0.25:2019.75), # adjust
+    timeline = collect(1991.25:0.25:2025.75),
     show_fig = false,
     save_fig = true,
     path = paths["bld_example"] * "/HDs",
@@ -477,35 +386,25 @@ plot_hist_decomp(
 
 mkpath(paths["bld_example"] * "/HDs_cat");
 plot_hist_decomp(
-    [
-        (:Ygrowth, "Output growth"),
-        (:Cgrowth, "Consumption growth"),
-        (:Igrowth, "Investment growth"),
-        (:N, "Employment"),
-        (:wgrowth, "Wage growth"),
-        (:RB, "Nominal rate"),
-        (:π, "Inflation"),
-        (:σ, "Income risk"),
-        #(:GI, "Gov. Investment"),
-        (:Sp, "Public capital in construction"),
-        (:KG, "Finished public capital"),
-        (:Tprog, "Tax progressivity"),
-        (:TOP10Wshare, "Top 10 wealth share"),
-        (:TOP10Ishare, "Top 10 inc. share"),
-    ],
+    vars_to_plot,
     ShockContr,
     ShockContr_order,
     sr_mc.indexes_r;
     shock_categories = Dict(
         ("Monetary", "mon") => [:Rshock, :A],
-        ("Fiscal", "fis") => [:Gshock, :Tprogshock, :GI],
+        ("Fiscal", "fis") => [:Gshock, :GI], # :Tprogshock,
         ("Productivity", "pro") => [:TFP, :ZI, :μ, :μw],
     ),
-    timeline = collect(1954.75:0.25:2019.75), #adjust
+    timeline = collect(1991.25:0.25:2025.75),
     show_fig = false,
     save_fig = true,
     path = paths["bld_example"] * "/HDs_cat",
 );
+
+# Print cumulative mutipliers
+println("\n--- Cumulative PV Multipliers: Public Investment (AR1 - Model) ---")
+table_GI = compute_pv_multipliers(IRFs_mode, IRFs_order, sr_mode.indexes_r, sr_mode.XSS, :GI; max_horizon = 80)
+display(table_GI)
 
 @printf "\n"
 @printf "Done.\n"

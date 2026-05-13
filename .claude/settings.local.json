@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"c:\\\\GitRepos\\\\BASEtoolboxJP.jl\" -Force)",
+      "Bash(Select-Object Name, Mode)",
+      "Bash(Get-ChildItem -Path \"c:\\\\GitRepos\\\\BASEtoolboxJP.jl\\\\examples\\\\baseline_TTB_AR1\\\\\" -Recurse -File | Select-Object -ExpandProperty FullName | head -20)",
+      "Bash(xargs grep *)"
+    ]
+  }
+}

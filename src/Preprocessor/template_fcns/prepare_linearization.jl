@@ -200,13 +200,13 @@ end
     copula_marg_equi(CDF_i, grid_i, nx)
 """
 function copula_marg_equi(CDF_i, grid_i, nx)
-    distr_i = [0.0; diff(CDF_i)]
+    distr_i = [CDF_i[1]; diff(CDF_i)]
     aux_marginal = collect(range(CDF_i[1]; stop = CDF_i[end], length = nx))
 
-    x2 = 1.0
+    x2 = CDF_i[end]
     for i = 1:(nx - 1)
         equi(x1) = equishares(x1, x2, grid_i, distr_i, nx)
-        x2 = find_zero(equi, (eps(), x2))
+        x2 = find_zero(equi, (CDF_i[1], x2))
         aux_marginal[end - i] = x2
     end
 

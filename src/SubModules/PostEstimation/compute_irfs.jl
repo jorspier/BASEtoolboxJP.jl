@@ -61,7 +61,7 @@ function compute_irfs(
     hx::Matrix{Float64},
     XSS::Vector{Float64},
     ids;
-    T::Int64 = 1000,
+    T::Int64 = 100,
     init_val::Vector{Float64} = fill(0.01, length(exovars)),
     verbose::Bool = true,
     irf_interval_options = nothing,
