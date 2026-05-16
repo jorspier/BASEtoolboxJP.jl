@@ -38,10 +38,12 @@ BASEforHANK.LinearAlgebra.BLAS.set_num_threads(Threads.nthreads());
 
 m_par = ModelParameters();
 
-@set! m_par.β = 0.9923121076496764
-@set! m_par.λ = 0.08021000338907154
-@set! m_par.ζ = 0.003149051319305283
-@set! m_par.Rbar = 0.011993601601887893
+@set! m_par.β = 0.991
+@set! m_par.λ = 0.071
+@set! m_par.ζ = 0.002
+@set! m_par.Rbar = 0.029
+@set! m_par.Tlev = 1.22
+#@set! m_par.ωΠ = 0.186   # initial guess (analytic: ιΠ × (B−Bgov)/Π_F at K/Y=2.62, B/K=0.37)
 
 
 ## ------------------------------------------------------------------------------------------
@@ -58,19 +60,15 @@ function moments_function_example(m_par)
     B    = exp(sr_full.XSS[sr_full.indexes.BSS])
     Y    = exp(sr_full.XSS[sr_full.indexes.YSS])
     Bgov = exp(sr_full.XSS[sr_full.indexes.BgovSS])
-    TOP10Wshare = exp(sr_full.XSS[sr_full.indexes.TOP10WshareSS])
+    #TOP10Wshare = exp(sr_full.XSS[sr_full.indexes.TOP10WshareSS])
     GiniW = exp(sr_full.XSS[sr_full.indexes.GiniWSS])
-
-    #B_raw = B/K
-    #BK_lo, BK_hi, BK_target = 0.35, 0.45, 0.40
-
-    #G    = exp(sr_full.XSS[sr_full.indexes.GSS])
+    G    = exp(sr_full.XSS[sr_full.indexes.GSS])
     #T    = exp(sr_full.XSS[sr_full.indexes.TSS])
     #TOP10Ishare = exp(sr_full.XSS[sr_full.indexes.TOP10IshareSS])
     #sdlogy = exp(sr_full.XSS[sr_full.indexes.sdlogySS])
 
     # Fraction of borrowers
-    # fr_borr = BASEforHANK.eval_cdf(sr_full.distrSS, :b, sr_full.n_par, 0.0)
+    fr_borr = BASEforHANK.eval_cdf(sr_full.distrSS, :b, sr_full.n_par, 0.0)
 
     # Top 10% wealth share 
     # n_par = ss_full.n_par
@@ -87,53 +85,43 @@ function moments_function_example(m_par)
 
     # TOP10Wshare = 1.0 - BASEforHANK.Tools.mylinearinterpolate(cum_dist, wealthshares, [0.9])[1]
         
-    if GiniW >= 1.0
-        return Dict(k => 1e6 for k in keys(target_moments))
-    end
+    # if GiniW >= 1.0
+    #     return Dict(k => 1e6 for k in keys(target_moments))
+    # end
 
     return Dict(
         "K/Y"            => (K / Y) / 4.0,
         "B/K"            => B/K, 
         "Bgov/Y"         => (Bgov / Y) / 4.0,
-        "T10W"           => TOP10Wshare,
+        #"T10W"           => TOP10Wshare,
         "GiniW"          => GiniW,
         #"B/Y"            =>  (B / Y) / 4.0,
-        #"G/Y"            =>  G / Y,
-        #"Frac Borrowers" =>  fr_borr,
+        "G/Y"            =>  G / Y,
+        "Frac Borrowers" =>  fr_borr,
     )
 
     return model_moments
 end;
+
 
 # Generate dictionary for calibration
 using Optim;
 
 # For Nelder-Mead
 cal_dict = Dict(
-    "params_to_calibrate" => [  :β,     # discount factor
-                                :λ,     # asset adjustement friction
-                                #:Tlev,  # income tax level
-                                :ζ,     # prob. to become entrepreneur
-                                :Rbar, # borrowing wedge
-                                #:δ_0,   # depreciation rate
-                                #:ρ_h,   # persistence of income shock
-                                #:σ_h,   # std. dev. of income shock
-                            ],
-    "target_moments" => Dict( # User-defined targets # these are from paper
-        "K/Y" => 3.2,  # Capital-output (quarterly) ratio
-        "Bgov/Y" => 0.66, # debt to output ratio 
-        #"G/Y" => 0.21,  # Gov. spending-output (annualy) ratio
-        #"T/Y" => 0.24,  # Tax revenue to output ratio (annual)
-        "B/K" => 0.37,  # Liquid to illiquid ratio
-        "T10W" => 0.58,  # Top 10% wealth share
+    "params_to_calibrate" => [:β, :λ, :ζ, :Rbar, :ωΠ, :Tlev],
+    "target_moments" => Dict(
+        "K/Y" => 2.62,  # Capital-output (annual) ratio, excl. dwellings
+        "Bgov/Y" => 0.66, # debt-to-output ratio
+        "G/Y" => 0.21,  # Gov. spending-output ratio
+        "B/K" => 0.37,  # Liquid-to-illiquid ratio
+        #"T10W" => 0.58,  # Top 10% wealth share
         "GiniW" => 0.74,
-        #"T10I" => 0.32,  # Top 10% income share
-        #"sdlog(y)" => 0.60, # standard deviation of log income (SOEP)
-        #"Frac Borrowers" => 0.12,  # Fraction of borrowers
+        "Frac Borrowers" => 0.15,  # Fraction of borrowers
     ),
     # One must change options for their respective setting!
     "opt_options" => Optim.Options(;
-        time_limit = 7200, # 10800 for 3h
+        time_limit = 1200, # 10800 for 3h
         show_trace = true,
         show_every = 10, # iteration count
         f_reltol = 1e-5,   # stops if fitness ≤ tolerance
@@ -143,29 +131,27 @@ cal_dict = Dict(
 
 # For BBO
 cal_dict_BBO = Dict(
-    "params_to_calibrate" => [:β, :λ, :ζ, :Rbar, :σ_h],
-    #"params_to_calibrate" => [:β, :λ, :Tlev, :Tprog, :δ_0, :ζ, :ρ_h, :σ_h],
+    "params_to_calibrate" => [:β, :λ, :ζ, :Rbar, :ωΠ, :Tlev],
     "target_moments" => Dict( # User-defined targets # these are from paper
-        "K/Y" => 3.2,       # Capital-output (quarterly) ratio
+        "K/Y" => 2.62,       # Capital-output (quarterly) ratio
         "Bgov/Y" => 0.66,   # debt to output ratio (average)
-        #"G/Y" => 0.21,     # Gov. spending-output (annual) ratio
+        "G/Y" => 0.21,     # Gov. spending-output (annual) ratio
         "B/K" => 0.37,      # Liquid to illiquid ratio (42 is the average, 37 the 2023 value)
-        "T10W" => 0.58,     # Top 10% wealth share (average)
-        #"GiniW" => 0.74,   # Wealth Gini (average)
-        #"Frac Borrowers" => 0.18,  # Fraction of borrowers
+        #"T10W" => 0.58,     # Top 10% wealth share (average)
+        "GiniW" => 0.74,   # Wealth Gini (average)
+        "Frac Borrowers" => 0.15,  # Fraction of borrowers (Bundesbank PHF)
     ),
     # One must change options for their respective setting!
     "opt_options" => (
         SearchRange=[
             (0.985, 0.9995), # β
             (0.02, 0.1), # λ
-            #(1.1, 1.5), # Tlev
-            #(1.1, 1.5), # Tprog
-            #(0.01, 0.04), # δ_0
-            (0.0007, 0.005), # ζ
+            (0.0007, 0.004), # ζ
             (0.009, 0.04), # Rbar
-            #(0.95, 0.999), # ρ_h
-            (0.05, 0.3), # σ_h
+            #(0.05, 0.3), # σ_h
+            # ιΠ fixed at 0.020 from Destatis data; not calibrated
+            (0.05, 0.45), # ωΠ — analytic target ~0.272 at K/Y=2.62, B/K=0.37
+            (1.1, 1.4) # Tlev
         ],
         Method=:adaptive_de_rand_1_bin_radiuslimited,
         MaxTime=2*60*60, 

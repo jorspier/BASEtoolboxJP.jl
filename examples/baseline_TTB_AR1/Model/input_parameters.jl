@@ -47,11 +47,11 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
     ρ_h::T = 0.9823 | "rho" | "autocorrelation of income shocks" | L"\rho" | _ | false
     σ_h::T = 0.135 | "sigma" | "standard deviation of income shocks" | L"\sigma" | _ | false # BKMS
     ι::T = 1 / 16 | "iota" | "probability to return worker" | L"\iota" | _ | false # BKMS
-    ζ::T = 0.000806239961928946 | "zeta" | "probability to become entrepreneur" | L"\zeta" | _ | false # BKMS
+    ζ::T = 0.001 | "zeta" | "probability to become entrepreneur" | L"\zeta" | _ | false # BKMS
 
     # Technological parameters
     α::T = 0.32 | "alpha" | "capital share" | L"\alpha" | _ | false # BKMS (check)
-    δ_0::T = 0.018 | "delta" | "depreciation rate" | L"\delta" | _ | false # 0.018 in BKMS
+    δ_0::T = 0.0143 | "delta" | "depreciation rate" | L"\delta" | _ | false # 0.018 in BKMS
     δ_s::T =
         0.7 |
         "delta_s" |
@@ -91,21 +91,21 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
     Tk::T = 1.0 + 0.25 | "Tk" | "capital income tax rate (gross)" | L"T_k" | _ | false
     Ttr_1::T = 1.0 + 0.5 | "Ttr1" | "lump-sum transfer param 1" | L"\tau_{tr1}" | _ | false
     Ttr_2::T = 1.0 + 0.8 | "Ttr2" | "lump-sum transfer param 2" | L"\tau_{tr2}" | _ | false
-    RRB::T = 1.0056 | "RB" | "real rate on bonds (gross)" | L"RRB" | _ | false
-    Rbar::T = 0.01606701538104354 | "Rbar" | "borrowing wedge" | L"\bar R" | _ | false # 0.036798968157815665
+    RRB::T = 1.0 | "RB" | "real rate on bonds (gross)" | L"RRB" | _ | false
+    Rbar::T = 0.029 | "Rbar" | "borrowing wedge" | L"\bar R" | _ | false # 0.036798968157815665
     q::T = 1.0 | "q" | "price of capital" | L"q" | _ | false
     Z::T = 1.0 | "Z" | "Effective TFP (including gov. investment)" | L"Z" | _ | false
     σ::T = 1.0 | "sigma" | "income risk" | L"\sigma" | _ | false
 
     # Tradable shares
     ωΠ::T =
-        0.2 |
+        0.186 |
         "omegaPi" |
         "fraction tradable profits" |
         L"\omega^{\Pi}" |
-        Beta(beta_pars(0.2, 0.075^2)...) |
-        true
-    ιΠ::T = 0.016 | "iotaPi" | "fraction depreciating shares" | L"\iota^{\Pi}" | _ | false
+        Beta(beta_pars(0.186, 0.05^2)...) |
+        false
+    ιΠ::T = 0.0137 | "iotaPi" | "fraction depreciating shares" | L"\iota^{\Pi}" | _ | false # Destatis: 5.14% annual death rate, limited liability enterprises / 4Q
     shiftΠ::T =
         0.5 |
         "shiftPi" |
@@ -407,7 +407,7 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
         true
 
     δ_KG::T =
-        0.015 | # usually lower than private
+        0.0072 | 
         "delta_KG" |
         "depreciation rate of public capital" |
         L"\delta_{K^G}" |

@@ -101,7 +101,7 @@ end
 
 total_wealth_grid(q, n_par::NumericalParameters, model::OneAsset) = n_par.grid_b
 total_wealth_grid(q, n_par::NumericalParameters, model::TwoAsset) =
-    vec(n_par.grid_b' .+ q .* n_par.grid_k)
+    vec(n_par.grid_b .+ q .* n_par.grid_k')
 total_wealth_cdf(distr::CDF, model::OneAsset) = distr.CDF[:, end][:]
 total_wealth_cdf(distr::CDF, model::TwoAsset) = distr.CDF[:, :, end][:]
 total_wealth_cdf(distr::CopulaOneAsset, model::OneAsset) = distr.COP[:, end][:]

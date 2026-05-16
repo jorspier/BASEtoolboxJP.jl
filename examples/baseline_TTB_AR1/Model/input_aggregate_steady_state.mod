@@ -91,7 +91,8 @@ CSS =
 TSS =
     (TbarSS .- 1.0) .* (wHSS .* NSS + Π_ESS + Π_USS) +
     (TcSS .- 1.0) .* CSS +
-    (TkSS .- 1.0) .* (RK_before_taxesSS .- 1.0) .* KSS - (TRSS .- 1.0)
+    (TkSS .- 1.0) .* (RK_before_taxesSS .- 1.0) .* KSS - 
+    (TRSS .- 1.0)                                       # transfers are directly deducted
 
 # government spending from budget constraint
 GSS = TSS - (RRLSS - 1.0) * BgovSS - GISS
