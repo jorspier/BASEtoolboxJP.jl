@@ -46,6 +46,16 @@ IRFs as produced by `compute_irfs`.
   - `horizon::Int64`: The time horizon (number of periods) over which IRFs are plotted.
     Default is `40`.
   - `factor::Int64`: Scaling factor for the IRFs (default: `100`).
+  - `fig_size::Tuple{Int,Int}`: Total figure size in pixels `(width, height)`. When height
+    is `0` (the default), it is computed automatically as `250 * nrow + 150` so that each
+    row keeps a fixed height regardless of how many variables are plotted. Pass an explicit
+    size to override, e.g. `fig_size = (1800, 1000)`.
+  - `ncols::Int`: Number of subplot columns (default: `4`).
+  - `subplot_bottom_margin`: Extra space below each subplot for x-axis tick labels. Pass a
+    `Measures` value such as `8 * Plots.mm`, or leave as `nothing` to use the default of
+    `8 * Plots.mm`. Increase if bottom labels are clipped.
+  - `subplot_left_margin`: Extra space left of each subplot for y-axis tick labels. Same
+    convention as `subplot_bottom_margin` (default: `8 * Plots.mm`).
   - `legend_on_all::Bool`: If `true`, includes the legend on all subplots; otherwise, only
     the first subplot has a legend. Default is `false`.
   - `show_fig::Bool`: If `true`, displays the plot. Default is `true`.
@@ -76,6 +86,10 @@ function plot_irfs(
     plot_data_irfs::Bool = false,
     horizon::Int64 = 40,
     factor::Int64 = 100,
+    fig_size::Tuple{Int,Int} = (1800, 0),
+    ncols::Int = 4,
+    subplot_bottom_margin = nothing,
+    subplot_left_margin = nothing,
     legend_on_all::Bool = false,
     show_fig::Bool = true,
     save_fig::Bool = false,
@@ -89,15 +103,28 @@ function plot_irfs(
         error("`e_set` must be provided when `plot_data_irfs` is true.")
     end
 
+    # Compute layout dimensions up-front so height can scale with nrow
+    ncol = ncols
+    nrow = ceil(Int, length(vars_to_plot) / ncol)
+    fig_height = fig_size[2] == 0 ? 250 * nrow + 150 : fig_size[2]
+    fig_width  = fig_size[1]
+
+    # Resolve margin values at runtime so callers never need to import Measures directly.
+    # Plots.mm is always accessible as a qualified name after `using Plots`.
+    _bottom_margin = isnothing(subplot_bottom_margin) ? 4 * Plots.mm : subplot_bottom_margin
+    _left_margin   = isnothing(subplot_left_margin)   ? 4 * Plots.mm : subplot_left_margin
+
     # General stylistic choices for the plots
     pp_layout = (
-        dpi = 300,
-        size = (1800, 1000),
+        dpi = 600,
+        size = (fig_width, fig_height),
         foreground_color_legend = nothing,
         background_color_legend = nothing,
         tickfont = font(14, "Computer Modern"),
         titlefont = font(16, "Computer Modern"),
-        legendfont = font(12, "Computer Modern"),
+        legendfont = font(14, "Computer Modern"),
+        bottom_margin = _bottom_margin,
+        left_margin = _left_margin,
         lw = style_options.lw,
     )
 
@@ -305,10 +332,7 @@ function plot_irfs(
             push!(pp, p)
         end
 
-        # Combine all plots in a single figure, with a layout of nrow x ncol
-        n = length(pp)
-        ncol = ceil(Int, sqrt(n))
-        nrow = ceil(Int, n / ncol)
+        # Combine all plots in a single figure
         fig = plot(pp...; layout = (nrow, ncol), pp_layout...)
 
         # Save combined plot directly in the IRFs folder

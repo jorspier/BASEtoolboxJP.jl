@@ -192,7 +192,29 @@ function mode_finding(sr, lr, m_par, e_set, par_start)
             f_reltol = e_set.f_tol,
             iterations = div(e_set.max_iter_mode, 3) * 2,
         )
-        opti = optimize(LL, Optim.minimizer(opti), e_set.optimizer, OptOpt)
+
+        # The reduction update above (model_reduction / update_model) can change the BK
+        # feasibility landscape: par_final from pass 1 may have been feasible under the
+        # *old* reduction (computed at the prior mode) but indeterminate under the *new*
+        # reduction (computed at the pass-1 mode).  Starting pass 2 from an infeasible
+        # point causes Nelder-Mead to immediately collapse its simplex (all vertices return
+        # the alarm penalty ≈ 9e15) and make no progress.
+        # Guard: if the new LL is at the alarm value, fall back to the original par_start
+        # (prior mode), which is guaranteed feasible when mode_start_file is empty.
+        par_final_pass1 = Optim.minimizer(opti)
+        ll_pass1_under_new_reduc = LL(par_final_pass1)
+        if ll_pass1_under_new_reduc > 1e14
+            # par_final from pass 1 is infeasible under the updated reduction.
+            # Fall back to the original par_start (prior mode), which is guaranteed feasible.
+            start_par2 = par
+            if sr.n_par.verbose
+                @printf "par_final infeasible under updated reduction — restarting pass 2 from prior mode.\n"
+            end
+        else
+            start_par2 = par_final_pass1
+        end
+
+        opti = optimize(LL, start_par2, e_set.optimizer, OptOpt)
         par_final = Optim.minimizer(opti)
 
         # Update estimated model parameters and resolve model
@@ -244,6 +266,39 @@ function mode_finding(sr, lr, m_par, e_set, par_start)
             @printf "Likelihood at mode under reduction: old: %f new: %f\n" ll_old posterior_mode
         end
 
+        # If the mode is infeasible under the updated reduction, re-optimize.
+        # This can happen when model_reduction changes the BK-feasibility landscape
+        # enough that par_final from the previous round is no longer a valid interior point.
+        # NOTE: alarm value gives LL_final ≈ +9e15, so posterior_mode = -LL_final ≈ -9e15.
+        #       The check must be < -1e14 (large *negative*), not > 1e14.
+        if posterior_mode < -1e14
+            if sr.n_par.verbose
+                @printf "Mode infeasible under new reduction (posterior = %e). Re-optimizing...\n" posterior_mode
+            end
+            OptOpt_rerun = Optim.Options(;
+                show_trace = sr.n_par.verbose,
+                show_every = 20,
+                store_trace = true,
+                x_abstol = e_set.x_tol,
+                f_reltol = e_set.f_tol,
+                iterations = div(e_set.max_iter_mode, 3),  # short re-run: par_final is already near a good region
+            )
+            opti_rerun = optimize(LL_final, par_final, e_set.optimizer, OptOpt_rerun)
+            par_final  = Optim.minimizer(opti_rerun)
+            if e_set.me_treatment != :fixed
+                m_par = Flatten.reconstruct(
+                    m_par,
+                    par_final[1:(length(par_final) - length(meas_error))],
+                )
+            else
+                m_par = Flatten.reconstruct(m_par, par_final)
+            end
+            posterior_mode = -LL_final(par_final)
+            if sr.n_par.verbose
+                @printf "Posterior at re-optimized mode: %f\n" posterior_mode
+            end
+        end
+
         # Run Kalman smoother
         smoother_output = likeli(
             par_final,
@@ -266,7 +321,7 @@ function mode_finding(sr, lr, m_par, e_set, par_start)
                 @printf "Computing Hessian. This might take a while...\n"
             end
             hessian_final =
-                FiniteDiff.finite_difference_hessian(LL_final, par_final; relstep = 0.001)
+                FiniteDiff.finite_difference_hessian(LL_final, par_final; relstep = 1e-4, absstep = 1e-4)
         else
             if sr.n_par.verbose
                 @printf "Assuming Hessian is I...\n"

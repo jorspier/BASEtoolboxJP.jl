@@ -39,23 +39,7 @@ BASEforHANK.LinearAlgebra.BLAS.set_num_threads(Threads.nthreads());
 m_par = ModelParameters();
 
 # calibration parameters
-@set! m_par.β = 0.9970029793428591;
-@set! m_par.ζ = 0.00012783013575450006; 
-@set! m_par.Tlev = 1.3; 
-
-# manually changed
-@set! m_par.α = 0.32;
-@set! m_par.μ = 1.15;
-@set! m_par.μw = 1.15;
-@set! m_par.γ_Bτ = 0.0; 
-
-# new govt investment parameters
-@set! m_par.γ_GI = 1.0;                     # Deficit reaction to GI (0 = tax financed, 1 = debt)
-@set! m_par.GI_share = 0.028;                # Steady state share of govt investment
-@set! m_par.δ_KG = 0.015;                    # Depreciation of public capital (1% per quarter - 4% per year)
-@set! m_par.η_KG = 0.10;                    # Elasticity of output w.r.t public capital
-@set! m_par.ρ_GI = 1.0e-8                    # Persistence of GI shock
-@set! m_par.σ_Auth = 40.0 * (0.01453 / m_par.GI_share) 
+@set! m_par.β = 0.995;
 
 ## ------------------------------------------------------------------------------------------
 ## Preparing the calibration
@@ -70,15 +54,12 @@ function moments_function_example(m_par)
         Y    = exp(sr_full.XSS[sr_full.indexes.YSS])
         G    = exp(sr_full.XSS[sr_full.indexes.GSS])
         Bgov = exp(sr_full.XSS[sr_full.indexes.BgovSS])
-        KG   = exp(sr_full.XSS[sr_full.indexes.KGSS])
         T    = exp(sr_full.XSS[sr_full.indexes.TSS])
         
         return Dict(
             "K/Y"            => (K / Y) / 4.0,
             "Bgov/Y"         => (Bgov / Y) / 4.0,
             "G/Y"            =>  G / Y,
-            "KG/Y"           => (KG / Y) / 4.0,
-            "T/Y"            =>  T / Y,
         )
 
     catch
@@ -86,8 +67,6 @@ function moments_function_example(m_par)
             "K/Y"            => 1e6,
             "Bgov/Y"         => 1e6,
             "G/Y"            => 1e6,
-            "KG/Y"           => 1e6,
-            "T/Y"            => 1e6,
         )
     end
 end
@@ -97,48 +76,38 @@ using Optim;
 
 # For Nelder-Mead
 cal_dict = Dict(
-    "params_to_calibrate" => [  :β,     # discount factor
-                                :Tlev,  # income tax level
-                                :ζ,     # prob. to become entrepreneur
-                                :δ_0
-                                
+    "params_to_calibrate" => [  :β,   # discount factor
     ],
     "target_moments" => Dict( # User-defined targets # these are from paper
-        "K/Y" => 12.4 / 4,  # Capital-output ratio (Bundesbank assumes 3-3.2)
-        #"B/K" => 0.21,  # Liquid to illiquid ratio
-        "Bgov/Y" => 0.60, # debt to output ratio (0.21*12.4/4)
-        "G/Y" => 0.21,  # Gov. spending-output ratio (0.21 GER)
-        "T/Y" => 0.24,  # tax revenue to output ratio (0.22-0.24 GER)
+        "K/Y" => 2.7933,  # Capital-output ratio (Bundesbank assumes 3-3.2)
     ),
     # One must change options for their respective setting!
     "opt_options" => Optim.Options(;
-        time_limit = 3600, # 10800 for 3h
+        time_limit = 3*60, # 10800 for 3h
         show_trace = true,
         show_every = 10, # iteration count
-        f_reltol = 1e-5,   # stops if fitness ≤ tolerance
+        f_reltol = 1e-8,   # stops if fitness ≤ tolerance
     ),
 );
 #
 
 # For BBO
 cal_dict_BBO = Dict(
-    "params_to_calibrate" => [:β, :Tlev, :ζ, :δ_0], 
+    "params_to_calibrate" => [:β, :ωΠ, :Tlev], 
     "target_moments" => Dict( # User-defined targets # these are from paper
-        "K/Y" => 12.4 / 4,  # Capital-output (quarterly) ratio
-        "Bgov/Y" => 0.60, # debt to output ratio 
-        "G/Y" => 0.21,  # Gov. spending-output (annualy) ratio
-        "T/Y" => 0.24,  # tax revenue to output ratio (0.22-0.24 GER)
+        "K/Y" => 2.7933,  # Capital-output (quarterly) ratio
+        "Bgov/Y" => 0.652,
+        "G/Y" => 0.232,
     ),
     # One must change options for their respective setting!
     "opt_options" => (
         SearchRange=[
-            (0.98, 0.9995), # β
-            (1.1, 1.5), # Tlev
-            (0.0001, 0.0003), # ζ
-            (0.015, 0.25), # δ_0
+            (0.993, 0.997), # β
+            (0.1,0.3),      # ωΠ
+            (1.0, 1.30), # Tlev
         ],
         Method=:adaptive_de_rand_1_bin_radiuslimited,
-        MaxTime=20*60, 
+        MaxTime=3*60, 
         TraceInterval=30,
         TraceMode=:compact,
         TargetFitness=1e-5,   # stops if fitness ≤ tolerance
@@ -179,8 +148,6 @@ pretty_table(
         "Private Capital to Output Ratio" K / Y/4.0
         "Government Debt to Output Ratio" Bgov / Y/4.0
         "Government Spending to Output Ratio" G/Y
-        "Public Capital to Output Ratio" KG/Y/4.0
-        "Liquid to Illiquid Assets Ratio" B/K
     ];
     header = ["Variable", "Value"],
     title = "Steady State Moments - RANK",

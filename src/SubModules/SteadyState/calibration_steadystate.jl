@@ -51,9 +51,8 @@ function run_calibration(moments_function, cal_dict, m_par; solver = "NelderMead
     # Extract initial parameter values.
     param_vector = [getfield(m_par, k) for k in params_to_calibrate]
 
-    # Bounds: use user-specified SearchRange if provided; else compute defaults
-    #bounds = solver == "BBO" ? cal_dict["opt_options"][:SearchRange] : []
-    bounds = []
+    # Bounds: for NelderMead, read from cal_dict["bounds"] if provided; else unconstrained
+    bounds = (solver == "NelderMead" && haskey(cal_dict, "bounds")) ? cal_dict["bounds"] : []
 
     # Objective wrapper: maps optimizer vector -> parameter space -> evaluate moments
     function f_obj(z)
@@ -70,8 +69,9 @@ function run_calibration(moments_function, cal_dict, m_par; solver = "NelderMead
     end
 
     # choice of different optimizers
+    z_vector = map_params_to_z(param_vector, bounds)
     opti =
-        solver == "NelderMead" ? Optim.optimize(f_obj, param_vector, NelderMead(), OptOpt) :
+        solver == "NelderMead" ? Optim.optimize(f_obj, z_vector, NelderMead(), OptOpt) :
         solver == "BBO" ? bboptimize(f_obj, param_vector; OptOpt...) :
         error("Unknown solver: $solver, must be 'BBO' or 'NelderMead'")
     result =
@@ -261,7 +261,7 @@ function map_real_to_param(z, lo, hi)
     elseif !isfinite(lo) && isfinite(hi)
         return hi - softplus(z)
     else
-        error("Both bounds are infinite; provide at least one finite bound.")
+        return z  # both infinite: identity transform
     end
 end
 
@@ -278,13 +278,35 @@ function map_z_to_params(zvec, bounds)
     θ = similar(zvec)
     for i in eachindex(zvec)
         lo, hi = bounds[i]
-        if isfinite(lo) && isfinite(hi)
-            θ[i] = map_real_to_param(zvec[i], lo, hi)
-        elseif isfinite(lo) && !isfinite(hi)
-            θ[i] = lo + softplus(zvec[i])
-        else
-            error("Please provide a finite lower bound for parameter index $i.")
-        end
+        θ[i] = map_real_to_param(zvec[i], lo, hi)
     end
     return θ
+end
+
+"""
+    map_params_to_z(θvec, bounds)
+
+Inverse of `map_z_to_params`: convert constrained parameter vector `θvec` to the
+unconstrained optimizer space `z`. Used to warm-start NelderMead from a known parameter
+point when bounds are active.
+"""
+function map_params_to_z(θvec, bounds)
+    if isempty(bounds)
+        return copy(θvec)
+    end
+    z = similar(θvec)
+    for i in eachindex(θvec)
+        lo, hi = bounds[i]
+        if isfinite(lo) && isfinite(hi)
+            t = clamp((θvec[i] - lo) / (hi - lo), 1e-8, 1 - 1e-8)
+            z[i] = log(t / (1 - t))                          # logit
+        elseif isfinite(lo) && !isfinite(hi)
+            z[i] = log(expm1(max(θvec[i] - lo, 1e-10)))      # softplus_inv(θ - lo)
+        elseif !isfinite(lo) && isfinite(hi)
+            z[i] = log(expm1(max(hi - θvec[i], 1e-10)))      # softplus_inv(hi - θ)
+        else
+            z[i] = θvec[i]                                    # identity
+        end
+    end
+    return z
 end

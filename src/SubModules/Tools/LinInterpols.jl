@@ -491,7 +491,8 @@ function mylinearinterpolate3(
         end
         ind1[i] = copy(iL)
         xL = xgrd1[iL]
-        weight1r[i] = copy((xi .- xL) ./ (xgrd1[iL .+ 1] .- xL))
+        dx = xgrd1[iL + 1] - xL
+        weight1r[i] = iszero(dx) ? zero(xi) : (xi - xL) / dx
     end
 
     # Find left element of xeval2 on xgrd2
@@ -506,7 +507,8 @@ function mylinearinterpolate3(
         end
         ind2[i] = copy(iL)
         xL = xgrd2[iL]
-        weight2r[i] = copy((xi .- xL) ./ (xgrd2[iL .+ 1] .- xL))
+        dx = xgrd2[iL + 1] - xL
+        weight2r[i] = iszero(dx) ? zero(xi) : (xi - xL) / dx
     end
 
     # Find left element of xeval3 on xgrd3
@@ -521,7 +523,8 @@ function mylinearinterpolate3(
         end
         ind3[i] = copy(iL)
         xL = xgrd3[iL]
-        weight3r[i] = copy((xi .- xL) ./ (xgrd3[iL .+ 1] .- xL))
+        dx = xgrd3[iL + 1] - xL
+        weight3r[i] = iszero(dx) ? zero(xi) : (xi - xL) / dx
     end
 
     # Interpolate

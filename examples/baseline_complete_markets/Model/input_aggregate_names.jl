@@ -7,7 +7,7 @@
 n_rep = 1 # Number of n_rep of some model equations (e.g. countries, industries)
 
 # List of aggregate shocks, without duplication (e.g. across countries or industries)
-shock_names = [:TFP, :ZI, :μ, :μw, :A, :Rshock, :Gshock, :GI_news_shock, :Tprogshock, :Sshock]
+shock_names = [:TFP, :ZI, :μ, :μw, :A, :Rshock, :Gshock, :GI, :Tprogshock, :Sshock]
 
 # List of aggregate states, without duplication of names (e.g. across countries or industries)
 # Duplicated names are created below
@@ -36,50 +36,19 @@ state_names = [
     "K",
     "B",
     "KG",
-    "GI_news_shock",
+    "GI",
     "GI_lag1",
     "GI_lag2",
     "GI_lag3",
     "GI_lag4",
-    "GI_news_1",
-    "GI_news_2",
-    "GI_news_3",
-    "GI_news_4",
-    "GI_news_5",
-    "GI_news_6",
-    "GI_news_7",
-    "GI_news_8",
-    "GI_news_9",
-    "GI_news_10",
-    "GI_news_11",
-    "GI_news_12",
-    "GI_news_13",
-    "GI_news_14",
-    "GI_news_15",
-    "GI_news_16",
-    "GI_news_17",
-    "GI_news_18",
-    "GI_news_19",
-    "GI_news_20",
-    "GI_news_21",
-    "GI_news_22",
-    "GI_news_23",
-    "GI_news_24",
-    "GI_news_25",
-    "GI_news_26",
-    "GI_news_27",
-    "GI_news_28",
-    "GI_news_29",
-    "GI_news_30",
-    "GI_news_31",
-    "GI_news_32",
-    "GI_news_33",
-    "GI_news_34",
-    "GI_news_35",
-    "GI_news_36",
-    "GI_news_37",
-    "GI_news_38",
-    "GI_news_39",
+    "GI_lag5",
+    "GI_lag6",
+    "GI_lag7",
+    "GI_lag8",
+    "GI_lag9",
+    "GI_lag10",
+    "GI_lag11",
+    "GI_lag12",
 ]
 
 # List of (the subset) of aggregate states, that need to be duplicated (e.g. across countries or industries)
@@ -90,7 +59,7 @@ dup_state_names = Vector{String}(undef, 0)
 
 # List cross-sectional controls / distributional summary variables (no equations in aggregate model expected)
 # if these need to be duplicated, do by hand !
-distr_names = ["GiniC", "GiniW", "TOP10Ishare", "TOP10Inetshare", "TOP10Wshare", "sdlogy"]
+distr_names = ["BOT50Ishare", "BOT50Inetshare", "BOT50Wshare", "GiniC", "GiniI", "GiniInet", "GiniW", "TOP10Ishare", "TOP10Inetshare", "TOP10Wshare", "sdlogy"]
 
 control_names = [
     "RK_before_taxes",
@@ -136,9 +105,8 @@ control_names = [
     "Π_U",
     "Π_E",
     "TotalAssets",
+    "Z",
     "GIgrowth",
-    "GI",
-    "Z"
 ]
 
 # List of (the subset) of aggregate states, that need to be duplicated (e.g. across countries or industries)

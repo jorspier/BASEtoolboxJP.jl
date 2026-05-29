@@ -8,7 +8,9 @@ This file provides two dispatched implementations:
   - `distrSummaries(distr::RepAgent, ...)` — placeholder implementation that currently
     returns small numeric placeholders (`eps()`).
   - `distrSummaries(distr::Union{CDF,CopulaOneAsset,CopulaTwoAssets}, ...)` — concrete
-    implementation that returns the tuple `(TOP10Wshare, TOP10Ishare, TOP10Inetshare, giniwealth, giniconsumption, sdlogy)`.
+    implementation that returns the tuple
+    `(TOP10Wshare, BOT50Wshare, TOP10Ishare, TOP10Inetshare, BOT50Ishare, BOT50Inetshare,
+      giniwealth, giniconsumption, sdlogy, giniincome, gininetincome)`.
 
 # Arguments
 
@@ -22,14 +24,19 @@ This file provides two dispatched implementations:
 
 # Returns
 
-  - For the `CDF`/`Copula` dispatch, a 6-tuple:
+  - For the `CDF`/`Copula` dispatch, an 11-tuple:
 
       + `TOP10Wshare::Float64` — top 10% wealth share.
+      + `BOT50Wshare::Float64` — bottom 50% wealth share.
       + `TOP10Ishare::Float64` — top 10% gross income share.
       + `TOP10Inetshare::Float64` — top 10% net income share.
+      + `BOT50Ishare::Float64` — bottom 50% gross income share.
+      + `BOT50Inetshare::Float64` — bottom 50% net income share.
       + `giniwealth::Float64` — Gini coefficient of the wealth distribution.
       + `giniconsumption::Float64` — Gini coefficient of consumption.
       + `sdlogy::Float64` — standard deviation of log labor earnings.
+      + `giniincome::Float64` — Gini coefficient of gross income.
+      + `gininetincome::Float64` — Gini coefficient of net income.
 
 Notes
 
@@ -44,7 +51,7 @@ function distrSummaries(
     gross_income::AbstractArray,
     m_par::ModelParameters,
 )
-    return eps(), eps(), eps(), eps(), eps(), eps()
+    return eps(), eps(), eps(), eps(), eps(), eps(), eps(), eps(), eps(), eps(), eps()
 end
 
 function distrSummaries(
@@ -56,12 +63,22 @@ function distrSummaries(
     gross_income::AbstractArray,
     m_par::ModelParameters,
 )
-    TOP10Wshare, giniwealth = distr_summaries_wealth(distr, q, n_par)
+    TOP10Wshare, BOT50Wshare, giniwealth = distr_summaries_wealth(distr, q, n_par)
     giniconsumption = distr_summaries_consumption(pf, net_income[5], distr, n_par)
-    TOP10Ishare, TOP10Inetshare, sdlogy =
+    TOP10Ishare, TOP10Inetshare, BOT50Ishare, BOT50Inetshare, sdlogy, giniincome, gininetincome =
         distr_summaries_incomes(net_income, gross_income, distr, n_par)
 
-    return TOP10Wshare, TOP10Ishare, TOP10Inetshare, giniwealth, giniconsumption, sdlogy
+    return TOP10Wshare, BOT50Wshare, TOP10Ishare, TOP10Inetshare, BOT50Ishare, BOT50Inetshare,
+        giniwealth, giniconsumption, sdlogy, giniincome, gininetincome
+end
+
+# Clamp floating-point noise in cdf_to_pdf results to a valid PDF.
+# Copula reconstructions during linearization can produce tiny negative cell masses;
+# zeroing them and renormalizing prevents NaN propagation into log(Gini) calls.
+function nonneg_pdf(cdf)
+    p = max.(0.0, cdf_to_pdf(cdf))
+    s = sum(p)
+    return iszero(s) ? fill(one(eltype(p)) / length(p), size(p)) : p ./ s
 end
 
 """
@@ -84,28 +101,29 @@ function distr_summaries_wealth(
 
     # println("distr.COP: ", distr.COP)
 
-    # Common setup for all CDF methods
+    # Build 1D wealth distribution: sort by total wealth, then cumsum PDF to get CDF
     wealth_grid = total_wealth_grid(q, n_par, n_par.model)
-    wealth_cdf = total_wealth_cdf(distr, n_par.model)
+    wealth_pdf = total_wealth_pdf(distr, n_par.model)
 
     IX = sortperm(wealth_grid)
     wealth_grid = wealth_grid[IX]
-    wealth_cdf = wealth_cdf[IX]
-    # @assert all(diff(wealth_cdf) .>= 0)
-    # println("wealth_cdf after sorting: ", wealth_cdf)
+    wealth_pdf = wealth_pdf[IX]
+    wealth_cdf = cumsum(wealth_pdf)
 
     TOP10Wshare = topXshare(wealth_grid, wealth_cdf, 10.0, n_par.transition_type)
+    BOT50Wshare = botXshare(wealth_grid, wealth_cdf, 50.0, n_par.transition_type)
     giniwealth = gini(wealth_cdf, wealth_grid, n_par.transition_type)
-    return TOP10Wshare, giniwealth
+    return TOP10Wshare, BOT50Wshare, giniwealth
 end
 
-total_wealth_grid(q, n_par::NumericalParameters, model::OneAsset) = n_par.grid_b
+total_wealth_grid(_q, n_par::NumericalParameters, _model::OneAsset) = n_par.grid_b
 total_wealth_grid(q, n_par::NumericalParameters, model::TwoAsset) =
     vec(n_par.grid_b .+ q .* n_par.grid_k')
-total_wealth_cdf(distr::CDF, model::OneAsset) = distr.CDF[:, end][:]
-total_wealth_cdf(distr::CDF, model::TwoAsset) = distr.CDF[:, :, end][:]
-total_wealth_cdf(distr::CopulaOneAsset, model::OneAsset) = distr.COP[:, end][:]
-total_wealth_cdf(distr::CopulaTwoAssets, model::TwoAsset) = distr.COP[:, :, end][:]
+# Return joint PDF f(b,k) so distr_summaries_wealth can sort by wealth and cumsum to 1D CDF
+total_wealth_pdf(distr::CDF, model::OneAsset) = nonneg_pdf(distr.CDF[:, end])[:]
+total_wealth_pdf(distr::CDF, model::TwoAsset) = vec(nonneg_pdf(distr.CDF[:, :, end]))
+total_wealth_pdf(distr::CopulaOneAsset, model::OneAsset) = nonneg_pdf(distr.COP[:, end])[:]
+total_wealth_pdf(distr::CopulaTwoAssets, model::TwoAsset) = vec(nonneg_pdf(distr.COP[:, :, end]))
 
 """
     find_wealth_at_percentile(wealth_grid, wealth_cdf, p, transition_type)
@@ -175,6 +193,38 @@ function topXshare(grid, cdf, X::Real, transition_type::LinearTransition)
 end
 
 """
+    botXshare(grid, cdf, X::Real, transition_type)
+
+Compute the share of total wealth held by the bottom `X` percent of households.
+
+Arguments
+
+  - `grid`: wealth grid (values corresponding to `cdf`).
+  - `cdf`: cumulative distribution function evaluated on `grid` (last element ≈ 1).
+  - `X`: percentage in (0,100) representing bottom X percent (e.g., `50.0` for bottom 50%).
+  - `transition_type`: controls interpolation/integration method (Linear vs NonLinear).
+
+Notes
+
+  - Internally the code converts the percentage `X` to a cumulative probability `p = X/100`.
+"""
+function botXshare(grid, cdf, X::Real, transition_type::NonLinearTransition)
+    @assert 0.0 < X < 100.0 "X must be between 0 and 100"
+    wealth_at_X = find_wealth_at_percentile(grid, cdf, X / 100.0, transition_type)
+    total = aggregate_asset_helper(cdf, grid, transition_type, nothing, false)
+    total_up_to_X = aggregate_asset_helper(cdf, grid, transition_type, wealth_at_X, false)
+    return total_up_to_X / total
+end
+
+function botXshare(grid, cdf, X::Real, transition_type::LinearTransition)
+    @assert 0.0 < X < 100.0 "X must be between 0 and 100"
+    pdf = cdf_to_pdf(cdf)
+    cumulative = cumsum(grid .* pdf)
+    shares = cumulative ./ cumulative[end]
+    return mylinearinterpolate(cdf, shares, [X / 100.0])[1]
+end
+
+"""
     distr_summaries_consumption(pf, aux_x, distr, n_par)
 
 Compute the Gini coefficient for consumption.
@@ -219,7 +269,7 @@ function get_distr_c_sorted(
     # TODO - Adapt for correct CDF treatment (do not use pdfs or correct ones (derivative of CDFs))
     IX = sortperm(c[:])
     c[:] .= c[IX]
-    distr_c = cdf_to_pdf(get_joint_CDF(distr))[IX]
+    distr_c = nonneg_pdf(get_joint_CDF(distr))[IX]
     distr_c = cumsum(distr_c)
     return c[:], distr_c[:]
 end
@@ -240,12 +290,13 @@ function get_distr_c_sorted(
     distr_c = similar(c)
     c[:, :, :, 1] .= pf.x_a_star .+ aux_x
     c[:, :, :, 2] .= pf.x_n_star .+ aux_x
-    distr_c[:, :, :, 1] .= n_par.m_par.λ .* get_joint_CDF(distr)
-    distr_c[:, :, :, 2] .= (1 - n_par.m_par.λ) .* get_joint_CDF(distr)
+    joint_pdf = nonneg_pdf(get_joint_CDF(distr))
+    distr_c[:, :, :, 1] .= n_par.m_par.λ .* joint_pdf
+    distr_c[:, :, :, 2] .= (1 - n_par.m_par.λ) .* joint_pdf
 
     IX = sortperm(c[:])
     c[:] .= c[IX]
-    distr_c[:] .= distr_c[IX]
+    distr_c[:] .= cumsum(distr_c[:][IX])
 
     return c[:], distr_c[:]
 end
@@ -253,8 +304,9 @@ end
 """
     distr_summaries_incomes(net_income, gross_income, distr, n_par)
 
-Compute top-10 gross and net income shares and the standard deviation of log labor earnings.
-For the income definitions, see the indexing conventions in the codebase [`incomes`](@ref).
+Compute top-10 and bottom-50 gross and net income shares, and the standard deviation of
+log labor earnings. For the income definitions, see the indexing conventions in the
+codebase [`incomes`](@ref).
 """
 function distr_summaries_incomes(
     net_income::AbstractArray,
@@ -262,7 +314,7 @@ function distr_summaries_incomes(
     distr::Union{CDF,CopulaOneAsset,CopulaTwoAssets},
     n_par::NumericalParameters,
 )
-    Y_pdf = cdf_to_pdf(get_joint_CDF(distr))
+    Y_pdf = nonneg_pdf(get_joint_CDF(distr))
     capital_inc = net_income[2] .+ net_income[3] .- n_par.mesh_b
     Yidio = net_income[6] .+ capital_inc
     IX = sortperm(Yidio[:])
@@ -271,8 +323,10 @@ function distr_summaries_incomes(
     Y_w = Yidio .* Y_pdf[IX]
     net_incomeshares = cumsum(Y_w) ./ sum(Y_w)
     TOP10Inetshare = 1.0 .- mylinearinterpolate(Y_cdf, net_incomeshares, [0.9])[1]
+    BOT50Inetshare = mylinearinterpolate(Y_cdf, net_incomeshares, [0.5])[1]
+    gininetincome = gini(Y_cdf, Yidio, n_par.transition_type)
 
-    # Top 10 gross income share
+    # Top 10 and bottom 50 gross income shares
     Yidio = gross_income[1] .+ capital_inc
     IX = sortperm(Yidio[:])
     Yidio = Yidio[IX]
@@ -280,9 +334,11 @@ function distr_summaries_incomes(
     Y_w = Yidio .* Y_pdf[IX]
     incomeshares = cumsum(Y_w) ./ sum(Y_w)
     TOP10Ishare = 1.0 .- mylinearinterpolate(Y_cdf, incomeshares, [0.9])[1]
+    BOT50Ishare = mylinearinterpolate(Y_cdf, incomeshares, [0.5])[1]
+    giniincome = gini(Y_cdf, Yidio, n_par.transition_type)
 
     sdlogy = get_sdlogy(distr, gross_income, n_par)
-    return TOP10Ishare, TOP10Inetshare, sdlogy
+    return TOP10Ishare, TOP10Inetshare, BOT50Ishare, BOT50Inetshare, sdlogy, giniincome, gininetincome
 end
 
 """

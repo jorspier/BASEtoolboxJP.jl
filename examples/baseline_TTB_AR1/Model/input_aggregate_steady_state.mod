@@ -48,19 +48,19 @@ ISS = m_par.δ_0 * KSS
 GISS = m_par.GI_share * YSS
 KGSS = GISS / m_par.δ_KG
 
-# Constructino lags
+# Construction lags
 GI_lag1SS = GISS
 GI_lag2SS = GISS
 GI_lag3SS = GISS
 GI_lag4SS = GISS
-#GI_lag5SS = GISS
-#GI_lag6SS = GISS
-#GI_lag7SS = GISS
-#GI_lag8SS = GISS
-#GI_lag9SS = GISS
-#GI_lag10SS = GISS
-#GI_lag11SS = GISS
-#GI_lag12SS = GISS
+GI_lag5SS = GISS
+GI_lag6SS = GISS
+GI_lag7SS = GISS
+GI_lag8SS = GISS
+GI_lag9SS = GISS
+GI_lag10SS = GISS
+GI_lag11SS = GISS
+GI_lag12SS = GISS
 
 # financial market
 LPSS = RKSS / (RBSS / πSS)

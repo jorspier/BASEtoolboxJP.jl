@@ -179,16 +179,24 @@ function Fsys(
     ## ------------------------------------------------------------------------------------
 
     # Calculate distribution statistics (generalized moments)
-    TOP10WshareT, TOP10IshareT, TOP10InetshareT, GiniWT, GiniCT, sdlogyT =
+    TOP10WshareT, BOT50WshareT, TOP10IshareT, TOP10InetshareT, BOT50IshareT, BOT50InetshareT,
+        GiniWT, GiniCT, sdlogyT, GiniIT, GiniInetT =
         distrSummaries(distr, q, pf, n_par, net_income, gross_income, m_par)
 
     # Error terms on distribution summaries
+    FrBorrT = eval_cdf(distr, :b, n_par, 0.0)
+    F[indexes.FrBorr] = log.(FrBorr) - log.(FrBorrT)
     F[indexes.GiniW] = log.(GiniW) - log.(GiniWT)
     F[indexes.TOP10Ishare] = log.(TOP10Ishare) - log.(TOP10IshareT)
     F[indexes.TOP10Inetshare] = log.(TOP10Inetshare) - log.(TOP10InetshareT)
     F[indexes.TOP10Wshare] = log.(TOP10Wshare) - log.(TOP10WshareT)
+    F[indexes.BOT50Wshare] = log.(BOT50Wshare) - log.(BOT50WshareT)
+    F[indexes.BOT50Ishare] = log.(BOT50Ishare) - log.(BOT50IshareT)
+    F[indexes.BOT50Inetshare] = log.(BOT50Inetshare) - log.(BOT50InetshareT)
     F[indexes.GiniC] = log.(GiniC) - log.(GiniCT)
     F[indexes.sdlogy] = log.(sdlogy) - log.(sdlogyT)
+    F[indexes.GiniI] = log.(GiniI) - log.(GiniIT)
+    F[indexes.GiniInet] = log.(GiniInet) - log.(GiniInetT)
 
     ## ------------------------------------------------------------------------------------
     ## Return

@@ -88,14 +88,14 @@ F[indexes.Cgrowth] = (log(Cgrowth)) - (log(C / Clag))
 F[indexes.GIgrowth] = log(GIgrowth) - (log(GI/GI_lag1))
 
 ## Fiscal policy --------------------------------------------------------------------------
-
 # Deficit rule, see equation 33 in BBL
 F[indexes.π] =
     (log(BgovgrowthPrime)) - (
         -m_par.γ_B * (log(Bgov) - XSS[indexes.BgovSS]) +
         m_par.γ_Y * log(YREACTION) +
         m_par.γ_π * log(π) +
-        log(Gshock) +
+        (exp(XSS[indexes.GSS] - XSS[indexes.BgovSS])) *
+             (log(Gshock)) +
         (m_par.γ_GI * exp(XSS[indexes.GISS] - XSS[indexes.BgovSS])) *
             (log(GI) - XSS[indexes.GISS])
     )
@@ -288,63 +288,26 @@ F[indexes.ZI] = (log(ZIPrime)) - (m_par.ρ_ZI * log(ZI))
 # Capital utilisation: optimality condition for utilization
 F[indexes.u] = (log(MPKserv)) - (log(q * (δ_1 + δ_2 * (u - 1.0))))
 
-## Government investment -----------------------------------------------------------------------------
-
-# Government investment news shock process
-F[indexes.GI_news_shock] = (log(GI_news_shockPrime)) - (m_par.ρ_GI_news_shock * log(GI_news_shock))
-
-F[indexes.GI_news_1]  = log(GI_news_1Prime / GI_news_shock)  - log(GI_news_2)
-F[indexes.GI_news_2]  = log(GI_news_2Prime / GI_news_shock)  - log(GI_news_3)
-F[indexes.GI_news_3]  = log(GI_news_3Prime / GI_news_shock)  - log(GI_news_4)
-F[indexes.GI_news_4]  = log(GI_news_4Prime / GI_news_shock)  - log(GI_news_5)
-F[indexes.GI_news_5]  = log(GI_news_5Prime / GI_news_shock)  - log(GI_news_6)
-F[indexes.GI_news_6]  = log(GI_news_6Prime / GI_news_shock)  - log(GI_news_7)
-F[indexes.GI_news_7]  = log(GI_news_7Prime / GI_news_shock)  - log(GI_news_8)
-F[indexes.GI_news_8]  = log(GI_news_8Prime / GI_news_shock)  - log(GI_news_9)
-F[indexes.GI_news_9]  = log(GI_news_9Prime / GI_news_shock)  - log(GI_news_10)
-F[indexes.GI_news_10] = log(GI_news_10Prime / GI_news_shock) - log(GI_news_11)
-F[indexes.GI_news_11] = log(GI_news_11Prime / GI_news_shock) - log(GI_news_12)
-F[indexes.GI_news_12] = log(GI_news_12Prime / GI_news_shock) - log(GI_news_13)
-F[indexes.GI_news_13] = log(GI_news_13Prime / GI_news_shock) - log(GI_news_14)
-F[indexes.GI_news_14] = log(GI_news_14Prime / GI_news_shock) - log(GI_news_15)
-F[indexes.GI_news_15] = log(GI_news_15Prime / GI_news_shock) - log(GI_news_16)
-F[indexes.GI_news_16] = log(GI_news_16Prime / GI_news_shock) - log(GI_news_17)
-F[indexes.GI_news_17] = log(GI_news_17Prime / GI_news_shock) - log(GI_news_18)
-F[indexes.GI_news_18] = log(GI_news_18Prime / GI_news_shock) - log(GI_news_19)
-F[indexes.GI_news_19] = log(GI_news_19Prime / GI_news_shock) - log(GI_news_20)
-F[indexes.GI_news_20] = log(GI_news_20Prime / GI_news_shock) - log(GI_news_21)
-F[indexes.GI_news_21] = log(GI_news_21Prime / GI_news_shock) - log(GI_news_22)
-F[indexes.GI_news_22] = log(GI_news_22Prime / GI_news_shock) - log(GI_news_23)
-F[indexes.GI_news_23] = log(GI_news_23Prime / GI_news_shock) - log(GI_news_24)
-F[indexes.GI_news_24] = log(GI_news_24Prime / GI_news_shock) - log(GI_news_25)
-F[indexes.GI_news_25] = log(GI_news_25Prime / GI_news_shock) - log(GI_news_26)
-F[indexes.GI_news_26] = log(GI_news_26Prime / GI_news_shock) - log(GI_news_27)
-F[indexes.GI_news_27] = log(GI_news_27Prime / GI_news_shock) - log(GI_news_28)
-F[indexes.GI_news_28] = log(GI_news_28Prime / GI_news_shock) - log(GI_news_29)
-F[indexes.GI_news_29] = log(GI_news_29Prime / GI_news_shock) - log(GI_news_30)
-F[indexes.GI_news_30] = log(GI_news_30Prime / GI_news_shock) - log(GI_news_31)
-F[indexes.GI_news_31] = log(GI_news_31Prime / GI_news_shock) - log(GI_news_32)
-F[indexes.GI_news_32] = log(GI_news_32Prime / GI_news_shock) - log(GI_news_33)
-F[indexes.GI_news_33] = log(GI_news_33Prime / GI_news_shock) - log(GI_news_34)
-F[indexes.GI_news_34] = log(GI_news_34Prime / GI_news_shock) - log(GI_news_35)
-F[indexes.GI_news_35] = log(GI_news_35Prime / GI_news_shock) - log(GI_news_36)
-F[indexes.GI_news_36] = log(GI_news_36Prime / GI_news_shock) - log(GI_news_37)
-F[indexes.GI_news_37] = log(GI_news_37Prime / GI_news_shock) - log(GI_news_38)
-F[indexes.GI_news_38] = log(GI_news_38Prime / GI_news_shock) - log(GI_news_39)
-# Program ends exactly at period 40
-F[indexes.GI_news_39] = log(GI_news_39Prime / GI_news_shock) - log(XSS[indexes.GISS])
-
-# Current realized GI equals 1-period-ahead announcement
-F[indexes.GI] = log(GI) - log(GI_news_1)
+## Government investment -------
+F[indexes.GI] = (log(GIPrime)) - 
+    (m_par.ρ_GI * log(GI) + (1.0 - m_par.ρ_GI) * XSS[indexes.GISS])
 
 # Construction pipeline of public capital
 F[indexes.GI_lag1] = (log(GI_lag1Prime)) - (log(GI))
 F[indexes.GI_lag2] = (log(GI_lag2Prime)) - (log(GI_lag1))
 F[indexes.GI_lag3] = (log(GI_lag3Prime)) - (log(GI_lag2))
 F[indexes.GI_lag4] = (log(GI_lag4Prime)) - (log(GI_lag3))
+F[indexes.GI_lag5] = (log(GI_lag5Prime)) - (log(GI_lag4))
+F[indexes.GI_lag6] = (log(GI_lag6Prime)) - (log(GI_lag5))
+F[indexes.GI_lag7] = (log(GI_lag7Prime)) - (log(GI_lag6))
+F[indexes.GI_lag8] = (log(GI_lag8Prime)) - (log(GI_lag7))
+F[indexes.GI_lag9] = (log(GI_lag9Prime)) - (log(GI_lag8))
+F[indexes.GI_lag10] = (log(GI_lag10Prime)) - (log(GI_lag9))
+F[indexes.GI_lag11] = (log(GI_lag11Prime)) - (log(GI_lag10))
+F[indexes.GI_lag12] = (log(GI_lag12Prime)) - (log(GI_lag11))
 
 # Finished public capital
-F[indexes.KG] = (log(KGPrime)) - (log((1.0 - m_par.δ_KG) * KG + GI_lag4))
+F[indexes.KG] = (log(KGPrime)) - (log((1.0 - m_par.δ_KG) * KG + GI_lag1))
 
 # Effective Productivity
 F[indexes.Z] = (log(Z)) -

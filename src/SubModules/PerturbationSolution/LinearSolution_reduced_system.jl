@@ -61,16 +61,22 @@ function LinearSolution_reduced_system(
     grid = [CartesianIndex(i, j) for i in indices for j in indices]
     grid_BA_A = [CartesianIndex(i, j) for i in index_XAgg for j in index_XAggP]
     grid_BA_B = [CartesianIndex(i, j) for i in index_XAgg for j in index_XAgg]
-    A[grid] .= BA[grid_BA_A] # copy only the non-distribution part of the Jacobian
-    B[grid] .= BA[grid_BA_B] # copy only the non-distribution part of the Jacobian
+    # Work on copies to avoid mutating the caller's A and B arrays in-place.
+    # (The original code wrote directly into A/B, which permanently corrupted lr.A/lr.B
+    # after the first likelihood evaluation and made all subsequent calls use a stale
+    # Jacobian for the HA block.)
+    A_new = copy(A)
+    B_new = copy(B)
+    A_new[grid] .= BA[grid_BA_A] # copy only the non-distribution part of the Jacobian
+    B_new[grid] .= BA[grid_BA_B] # copy only the non-distribution part of the Jacobian
     # for k in eachindex(aggr_names)
     #     if !(aggr_names[k] in distr_names)
     #         j = indices_k[k]
     #         for h in eachindex(aggr_names)
     #             if !(aggr_names[h] in distr_names)
     #                 i = indices_h[h]
-    #                 A[j, i] = BA[k, h+length_X0]
-    #                 B[j, i] = BA[k, h]
+    #                 A_new[j, i] = BA[k, h+length_X0]
+    #                 B_new[j, i] = BA[k, h]
     #             end
     #         end
     #     end
@@ -79,7 +85,7 @@ function LinearSolution_reduced_system(
     ## --------------------------------------------------------------------------
     ## Solve the linearized model: Policy Functions and LOMs
 
-    gx, hx, alarm_LinearSolution, nk = SolveDiffEq(A, B, sr.n_par, allow_approx_sol)
+    gx, hx, alarm_LinearSolution, nk = SolveDiffEq(A_new, B_new, sr.n_par, allow_approx_sol)
 
-    return gx, hx, alarm_LinearSolution, nk, A, B
+    return gx, hx, alarm_LinearSolution, nk, A_new, B_new
 end

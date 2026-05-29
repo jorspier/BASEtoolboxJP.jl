@@ -39,44 +39,44 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
     # Household preference parameters
     ξ::T = 4.0 | "xi" | "risk aversion" | L"\xi" | _ | false # Kaplan &  Vioalnte (2014)
     γ::T = 2.0 | "gamma" | "inverse Frisch elasticity" | L"\gamma" | _ | false # Chetty et al. (2011)
-    β::T = 0.99 | "beta" | "discount factor" | L"\beta" | _ | false # 0.9815 BKMS
+    β::T = 0.9875734048672768 | "beta" | "discount factor" | L"\beta" | _ | false # 0.9815 BKMS
     λ::T =
-        0.045 |"lambda" | "illiquid asset adjustment probability" | L"\lambda" | _ | false # 0.071 BKMS
+        0.04411244973163206 |"lambda" | "illiquid asset adjustment probability" | L"\lambda" | _ | false # 0.071 BKMS
 
     # Individual income process
-    ρ_h::T = 0.9823 | "rho" | "autocorrelation of income shocks" | L"\rho" | _ | false # 0.9815 BKMS
-    σ_h::T = 0.135 | "sigma" | "standard deviation of income shocks" | L"\sigma" | _ | false # 0.135 BKMS
-    ι::T = 1 / 16 | "iota" | "probability to return worker" | L"\iota" | _ | false # same in BKMS
-    ζ::T = 0.0007 | "zeta" | "probability to become entrepreneur" | L"\zeta" | _ | false # 0.001 in BKMS 1/4500 in BBL (too sensitive for adjustments)
+    ρ_h::T = 0.9815 | "rho" | "autocorrelation of income shocks" | L"\rho" | _ | false # 0.9815 BKMS
+    σ_h::T = 0.22251591981275654 | "sigma" | "standard deviation of income shocks" | L"\sigma" | _ | false # 0.135 BKMS
+    ι::T = 0.06 | "iota" | "probability to return worker" | L"\iota" | _ | false # same in BKMS
+    ζ::T = 0.00043307074620808157 | "zeta" | "probability to become entrepreneur" | L"\zeta" | _ | false 
 
     # Technological parameters
-    α::T = 0.32 | "alpha" | "capital share" | L"\alpha" | _ | false # 0.32 BKMS
-    δ_0::T = 0.02 | "delta" | "depreciation rate" | L"\delta" | _ | false # 0.018 in BKMS, (0.07 + 0.016) / 4 in BBL
+    α::T = 0.32 | "alpha" | "capital share" | L"\alpha" | _ | false 
+    δ_0::T = 0.02 | "delta" | "depreciation rate" | L"\delta" | _ | false 
     δ_s::T =
-        5.0 | 
+        0.7055720197078786 | 
         "delta_s" |
         "slope of depreciation rate" |
         L"\delta_s" |
-        Gamma(gamma_pars(5.0, 2.0^2)...) | # 5 BKMS, previous prior was 0.1
+        Gamma(gamma_pars(3.0, 2.0^2)...) | 
         true
     ϕ::T =
-        4.0 | 
+        1.9409223183717077 | 
         "phi" |
         "capital adjustment costs" |
         L"\phi" |
-        Gamma(gamma_pars(4.0, 2.0^2)...) | # 4 in BKMS, previous prior was 0.5
+        Gamma(gamma_pars(3.0, 2.0^2)...) | 
         true
-    μ::T = 1.1 | "mu" | "price markup" | L"\mu" | _ | false # 11 -> 10% in BKMS
+    μ::T = 1.1 | "mu" | "price markup" | L"\mu" | _ | false 
     κ::T =
-        0.25 | # 0.25 in BKMS
+        0.2434123997479561 | 
         "kappa" |
         "price adjustment costs" |
         L"\kappa" |
         Gamma(gamma_pars(0.1, 0.03^2)...) |
         true
-    μw::T = 1.1 | "mu_w" | "wage markup" | L"\mu_w" | _ | false # 11 -> 10% in BKMS
+    μw::T = 1.1 | "mu_w" | "wage markup" | L"\mu_w" | _ | false 
     κw::T =
-        0.25 | # 0.25 in BKMS
+        0.23931075416274708 | 
         "kappa_w" |
         "wage adjustment costs" |
         L"\kappa_w" |
@@ -84,46 +84,46 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
         true
 
     # Further steady-state parameters
-    Tlev::T = 1.0 + 0.3 | "tau_lev" | "income tax rate level" | L"\tau^l" | _ | false # 0.3 BKMS?
+    Tlev::T = 1.1006962925529395 | "tau_lev" | "income tax rate level" | L"\tau^l" | _ | false # 0.3 BKMS?
     Tprog::T =
-        1.0 + 0.2 | "tau_pro" | "income tax rate progressivity" | L"\tau^p" | _ | false # 0.221 HKS
+        1.0 + 0.221 | "tau_pro" | "income tax rate progressivity" | L"\tau^p" | _ | false # 0.221 HKS
     Tc::T = 1.0 + 0.19 | "Tc" | "VAT rate (gross)" | L"T_c" | _ | false # 19% VAT in GER (breaks if increasing either tax rate)
     Tk::T = 1.0 + 0.25 | "Tk" | "capital income tax rate (gross)" | L"T_k" | _ | false # 1+ 0.25 for 25% tax rate in GER?
     Ttr_1::T = 1.0 + 0.5 | "Ttr1" | "lump-sum transfer param 1" | L"\tau_{tr1}" | _ | false
     Ttr_2::T = 1.0 + 0.8 | "Ttr2" | "lump-sum transfer param 2" | L"\tau_{tr2}" | _ | false
     RRB::T = (1.0 .^ 0.5) | "RB" | "real rate on bonds (gross)" | L"RRB" | _ | false
-    Rbar::T = 0.037966152 | "Rbar" | "borrowing wedge" | L"\bar R" | _ | false # 0.029 in BKMS, ((1.0725 .^ 0.25) .- 1.0) in BBL
+    Rbar::T = 0.040518537810552924 | "Rbar" | "borrowing wedge" | L"\bar R" | _ | false # 0.029 in BKMS, ((1.0725 .^ 0.25) .- 1.0) in BBL
     q::T = 1.0 | "q" | "price of capital" | L"q" | _ | false
     Z::T = 1.0 | "Z" | "Effective TFP (including gov. investment)" | L"Z" | _ | false 
     σ::T = 1.0 | "sigma" | "income risk" | L"\sigma" | _ | false
 
     # Tradable shares
     ωΠ::T =
-        0.2 |
+        0.18 |
         "omegaPi" |
         "fraction tradable profits" |
         L"\omega^{\Pi}" |
         Beta(beta_pars(0.2, 0.075^2)...) |
         false
-    ιΠ::T = 0.016 | "iotaPi" | "fraction depreciating shares" | L"\iota^{\Pi}" | _ | false
+    ιΠ::T = 0.0137 | "iotaPi" | "fraction depreciating shares" | L"\iota^{\Pi}" | _ | false
     shiftΠ::T =
-        0.5 |
+        0.7002848330469671 |
         "shiftPi" |
         "fraction tradable profits" |
         L"\shift^{\Pi}" |
         Beta(beta_pars(0.5, 0.25^2)...) |
-        true
+        false
 
     # monetary policy
     ρ_R::T =
-        0.75 | # from BKMS
+        0.8030565250630299 | # from BKMS
         "rho_R" |
         "persistence of Taylor rule" |
         L"\rho_R" |
         Beta(beta_pars(0.5, 0.2^2)...) |
-        true
+        false
     θ_π::T =
-        1.25 | # 1.25 in BKMS 
+        2.0780841671981856 | # 1.25 in BKMS 
         "theta_pi" |
         "reaction of Taylor rule to inflation" |
         L"\theta_\pi" |
@@ -131,23 +131,23 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
         false
 
     θ_Y::T =
-        0.0 | # ECB mandate (increase slightly)
+        0.21872568927661648 | # ECB mandate 
         "theta_Y" |
         "reaction of Taylor rule to output" |
         L"\theta_y" |
-        Normal(0.125, 0.05) |
+        Normal(0.0, 0.2) |
         false
 
     # fiscal policy
     scale_prog::Bool =
-        false | # crucial for the solver to work for GER
+        false | 
         "scale_prog" |
         "scaling of tax rate with tax base" |
         "scale_prog" |
         _ |
         false
     γ_B::T =
-        0.01 |
+        0.055196744163392764 |
         "gamma_B" |
         "reaction of deficit to debt" |
         L"\gamma_B" |
@@ -155,28 +155,28 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
         false 
         
     γ_π::T =
-        0.0 |
+        -2.1737350397931947 |
         "gamma_pi" |
         "reaction of deficit to inflation" |
         L"\gamma_{\pi}" |
         Normal(0.0, 1.0) |
-        true
+        false
 
     γ_Y::T =
-        0.0 |
+        -0.4363130165391906 |
         "gamma_Y" |
         "reaction of deficit to output" |
         L"\gamma_Y" |
         Normal(0.0, 1.0) |
-        true
+        false
 
     ρ_τ::T =
-        0.5 |
+        0.4926482696848203 |
         "rho_tau" |
         "persistence of tax rule" |
         L"\rho_\tau" |
         Beta(beta_pars(0.5, 0.2^2)...) |
-        true
+        false
 
     γ_Bτ::T =
         0.0 |
@@ -192,15 +192,15 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
         "reaction of tax level to output" |
         L"\gamma_{Y^\tau}" |
         Normal(0.0, 1.0) |
-        true
+        false
 
     ρ_P::T =
-        0.5 |
+        0.9194235885358465 |
         "rho_P" |
         "persistence of tax progressivity" |
         L"\rho_P" |
         Beta(beta_pars(0.5, 0.2^2)...) |
-        true
+        false
 
     γ_BP::T =
         0.0 |
@@ -233,15 +233,15 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
         "persistence of TFP" |
         L"\rho_{TFP}" |
         Beta(beta_pars(0.5, 0.2^2)...) |
-        true
+        false
 
     σ_TFP::T =
-        0.0 |
+        0.00033388842631140714 |
         "sigma_TFP" |
         "standard deviation of TFP shock" |
         L"\sigma_{TFP}" |
         InverseGamma(ig_pars(0.001, 0.02^2)...) |
-        true
+        false
 
     ρ_Sshock::T =
         0.0 |
@@ -268,22 +268,22 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
         false
 
     ρ_Gshock::T =
-        0.98 |
+        0.9682224473297878 |
         "rho_Gshock" |
         "autocorrelation of deficit shock" |
         L"\rho_D" |
         Beta(beta_pars(0.5, 0.2^2)...) |
-        true
+        false
     σ_Gshock::T =
-        0.00 |
+        0.003761816459554433 |
         "sigma_G" |
         "standard deviation of deficit shock" |
         L"\sigma_D" |
         InverseGamma(ig_pars(0.001, 0.02^2)...) |
-        true
+        false
 
     ρ_Rshock::T =
-        1e-8 |
+        0.5 |
         "rho_Rshock" |
         "autocorrelation of Taylor rule shock" |
         L"\rho_{Rshock}" |
@@ -291,75 +291,75 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
         false
     
     σ_Rshock::T =
-        0.0 |
+        0.002306627917745612 |
         "sigma_Rshock" |
         "standard deviation of Taylor rule shock" |
         L"\sigma_R" |
         InverseGamma(ig_pars(0.001, 0.02^2)...) |
-        true
+        false
 
     ρ_A::T =
-        0.9 |
+        0.9724112284399131 |
         "rho_A" |
         "autocorrelation of bond-spread shock" |
         L"\rho_A" |
         Beta(beta_pars(0.5, 0.2^2)...) |
-        true
+        false
     σ_A::T =
-        0.0 |
+        0.0015812471705012755 |
         "sigma_A" |
         "standard deviation of bond-spread shock" |
         L"\sigma_A" |
         InverseGamma(ig_pars(0.001, 0.02^2)...) |
-        true
+        false
 
     ρ_ZI::T =
-        0.9 |
+        0.7637111671257767 |
         "rho_Psi" |
         "autocorrelation of investment efficiency shock" |
         L"\rho_\Psi" |
         Beta(beta_pars(0.5, 0.2^2)...) |
-        true
+        false
     σ_ZI::T =
-        0.0 |
+        0.0721141538701523 |
         "sigma_Psi" |
         "standard deviation of investment efficiency shock" |
         L"\sigma_\Psi" |
         InverseGamma(ig_pars(0.001, 0.02^2)...) |
-        true
+        false
 
     ρ_μ::T =
-        0.9 |
+        0.903740078830077 |
         "rho_mu" |
         "autocorrelation of price markup shock" |
         L"\rho_\mu" |
         Beta(beta_pars(0.5, 0.2^2)...) |
-        true
+        false
     σ_μ::T =
-        0.0 |
+        0.01350860622318172 |
         "sigma_mu" |
         "standard deviation of price markup shock" |
         L"\sigma_\mu" |
         InverseGamma(ig_pars(0.001, 0.02^2)...) |
-        true
+        false
 
     ρ_μw::T =
-        0.9 |
+        0.9057892147641305 |
         "rho_muw" |
         "autocorrelation of wage markup shock" |
         L"\rho_{\mu w}" |
         Beta(beta_pars(0.5, 0.2^2)...) |
-        true
+        false
     σ_μw::T =
-        0.0 |
+        0.035058308969408175 |
         "sigma_muw" |
         "standard deviation of wage markup shock" |
         L"\sigma_{\mu w}" |
         InverseGamma(ig_pars(0.001, 0.02^2)...) |
-        true
+        false
 
     ρ_s::T =
-        0.84 | 
+        0.0 | 
         "rho_sigma" |
         "autocorrelation of income risk shock" |
         L"\rho_s" |
@@ -391,31 +391,22 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
         false # set 1 for debt-financing and 0 for govt consumption reduction
 
     GI_share::T = 
-        0.028 | # 3% of GDP according to Eurostat
+        0.0276 | # 3% of GDP according to Eurostat
         "GI_share" | 
         "steady state government investment share" | 
         L"\frac{GI}{Y}" | 
         _ | 
         false
 
-    ρ_GI::T = 
-        1.0e-8 | # the investments end abruptly
-        "rho_GI" | 
-        "autocorrelation of gov investment process" | 
-        L"\rho_{GI}" | 
-        _ |
-        false
-
-
-    ρ_GI_news_shock::T =
-        1e-8 |
+    ρ_GI_NS::T =
+        0.0 |
         "rho_GI_news_shock" |
         "autocorrelation of government investment news shock" |
         L"\rho_{GI\,news}" |
         _ |
         false
 
-    σ_GI_news_shock::T =
+    σ_GI_NS::T =
         log(1.0 + 0.01453 / GI_share) |
         "sigma_GI_news_shock" |
         "standard deviation of government investment news shock (500bn over 40 quarters)" |
@@ -427,24 +418,10 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
     # 500bn€ for 40 quarters = 12.5bn€ per quarter
     # approximately 1.453% of quarterly output
     # News shock hits all 39 GI_news variables equally at t=0
-    σ_Auth::T =
-        0.0 |
-        "sigma_Auth" |
-        "standard deviation of gov investment shock (deprecated, using news cascade)" |
-        L"\sigma_{Auth}" |
-        InverseGamma(ig_pars(0.001, 0.02^2)...) |
-        false
 
-    ϕ_GI::T =
-        1/15 |
-        "phi_GI" |
-        "spending rate of gov investment pipeline" |
-        L"\phi_{GI}" |
-        _ |
-        false
 
     δ_KG::T =
-        0.015 | # usually lower than private: 2% per quarter (8% per year)
+        0.0134| 
         "delta_KG" |
         "depreciation rate of public capital" |
         L"\delta_{K^G}" |
@@ -456,7 +433,7 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
         "eta_KG" | 
         "elasticity of public capital stock" | 
         L"\eta_{K^G}" | 
-        _ | 
+        Normal(0.1, 0.02) | 
         false # 0.05 - 0.15
 
 end
@@ -510,7 +487,7 @@ Collect parameters for the numerical solution of the model in a `struct`.
     kmin::Float64 = typeof(model) == TwoAsset ? 0.0 : 0.0
     kmax::Float64 = typeof(model) == TwoAsset ? 4500.0 : 0.0
     bmin::Float64 = typeof(model) == CompleteMarkets ? 0.0 : -6.0
-    bmax::Float64 = typeof(model) == CompleteMarkets ? 0.0 : 3500.0
+    bmax::Float64 = typeof(model) == CompleteMarkets ? 0.0 : 4500.0
 
     # precision of solution
     ϵ::Float64 = 1e-13

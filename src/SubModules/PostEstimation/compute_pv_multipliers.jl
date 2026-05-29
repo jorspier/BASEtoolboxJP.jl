@@ -11,7 +11,7 @@ function compute_pv_multipliers(irf_matrix, IRFs_order, indexes, XSS, shock_var_
     irf_matrix_shock = irf_matrix[:, :, shock_idx]
     
     # 1. Map the shock name to its respective IRF and Steady State indices
-    if shock_var_name == :G
+    if shock_var_name == :Gshock
         irf_idx = indexes.G
         ss_idx = indexes.GSS
     elseif shock_var_name == :GI

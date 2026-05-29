@@ -95,8 +95,10 @@ F[indexes.π] =
         -m_par.γ_B * (log(Bgov) - XSS[indexes.BgovSS]) +
         m_par.γ_Y * log(YREACTION) +
         m_par.γ_π * log(π) +
-        log(Gshock) +
-        (m_par.γ_GI * exp(XSS[indexes.GISS] - XSS[indexes.BgovSS])) * (log(GI) - XSS[indexes.GISS])
+        (exp(XSS[indexes.GSS] - XSS[indexes.BgovSS])) *
+            (log(Gshock)) +
+        (m_par.γ_GI * exp(XSS[indexes.GISS] - XSS[indexes.BgovSS])) * 
+            (log(GI) - XSS[indexes.GISS])
     ) 
 
 # Average tax rate, see equation 34 in BBL (here simplified)
@@ -289,6 +291,9 @@ F[indexes.I] =
 # Production function
 F[indexes.Y] = (log(Y)) - (log(output(Z, Kserv, N, m_par)))
 
+# Law of motion for the TFP shock
+F[indexes.TFP] = (log(TFPPrime)) - (m_par.ρ_TFP * log(TFP))
+
 # Capital utilisation: optimality condition for utilization
 F[indexes.u] = (log(MPKserv)) - (log(q * (δ_1 + δ_2 * (u - 1.0))))
 
@@ -298,28 +303,26 @@ F[indexes.ZI] = (log(ZIPrime)) - (m_par.ρ_ZI * log(ZI))
 ## Government investment ---------------------------------------------------------------------
 
 # Investment shock Law of Motion
-F[indexes.GI] = (log(GIPrime)) - (m_par.ρ_GI * log(GI) + 
-    (1.0 - m_par.ρ_GI) * XSS[indexes.GISS])
+F[indexes.GI] = (log(GIPrime)) - 
+    (m_par.ρ_GI * log(GI) + (1.0 - m_par.ρ_GI) * XSS[indexes.GISS])
 
 # 12-period Time-to-Build lags for government investment
 F[indexes.GI_lag1] = (log(GI_lag1Prime)) - (log(GI))
 F[indexes.GI_lag2] = (log(GI_lag2Prime)) - (log(GI_lag1))
 F[indexes.GI_lag3] = (log(GI_lag3Prime)) - (log(GI_lag2))
 F[indexes.GI_lag4] = (log(GI_lag4Prime)) - (log(GI_lag3))
-#F[indexes.GI_lag5] = (log(GI_lag5Prime)) - (log(GI_lag4))
-#F[indexes.GI_lag6] = (log(GI_lag6Prime)) - (log(GI_lag5))
-#F[indexes.GI_lag7] = (log(GI_lag7Prime)) - (log(GI_lag6))
-#F[indexes.GI_lag8] = (log(GI_lag8Prime)) - (log(GI_lag7))
-#F[indexes.GI_lag9] = (log(GI_lag9Prime)) - (log(GI_lag8))
-#F[indexes.GI_lag10] = (log(GI_lag10Prime)) - (log(GI_lag9))
-#F[indexes.GI_lag11] = (log(GI_lag11Prime)) - (log(GI_lag10))
-#F[indexes.GI_lag12] = (log(GI_lag12Prime)) - (log(GI_lag11))
+F[indexes.GI_lag5] = (log(GI_lag5Prime)) - (log(GI_lag4))
+F[indexes.GI_lag6] = (log(GI_lag6Prime)) - (log(GI_lag5))
+F[indexes.GI_lag7] = (log(GI_lag7Prime)) - (log(GI_lag6))
+F[indexes.GI_lag8] = (log(GI_lag8Prime)) - (log(GI_lag7))
+F[indexes.GI_lag9] = (log(GI_lag9Prime)) - (log(GI_lag8))
+F[indexes.GI_lag10] = (log(GI_lag10Prime)) - (log(GI_lag9))
+F[indexes.GI_lag11] = (log(GI_lag11Prime)) - (log(GI_lag10))
+F[indexes.GI_lag12] = (log(GI_lag12Prime)) - (log(GI_lag11))
+
 
 # Finished public capital
 F[indexes.KG] = (log(KGPrime)) - (log((1.0 - m_par.δ_KG) * KG + GI_lag4))
-
-# Law of motion for the TFP shock
-F[indexes.TFP] = (log(TFPPrime)) - (m_par.ρ_TFP * log(TFP))
 
 # Effective TFP
 F[indexes.Z] = (log(Z)) - 

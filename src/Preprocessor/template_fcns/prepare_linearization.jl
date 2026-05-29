@@ -92,8 +92,10 @@ function prepare_linearization(
     distrXSS_vec = vcat(vec.(struc_to_vec(distrSS))...)
 
     # Distributional summary statistics (for filling in the steady state vector)
-    TOP10WshareSS, TOP10IshareSS, TOP10InetshareSS, GiniWSS, GiniCSS, sdlogySS =
+    TOP10WshareSS, BOT50WshareSS, TOP10IshareSS, TOP10InetshareSS, BOT50IshareSS, BOT50InetshareSS,
+        GiniWSS, GiniCSS, sdlogySS, GiniISS, GiniInetSS =
         distrSummaries(distrSS, qSS, pfSS, n_par, net_income, gross_income, m_par)
+    FrBorrSS = eval_cdf(distrSS, :b, n_par, 0.0)
 
     ## ------------------------------------------------------------------------------------
     ## Step 2: Dimensionality reduction

@@ -189,6 +189,22 @@ function likeli_backend(
     if smoother == false
         return log_like, prior_like, post_like, alarm, State2Control
     else
+        if !@isdefined(smoother_output)
+            # alarm_prior or alarm_LinearSolution fired before the smoother could run.
+            # Return a dummy 7-tuple so callers always get the same return type.
+            n_s = sr.n_par.nstates_r
+            T_obs = size(Data, 1)
+            n_obs = size(H_sel, 1)
+            smoother_output = (
+                log_like,
+                zeros(n_s, T_obs),   # xhat_tgt
+                zeros(n_s, T_obs),   # xhat_tgT
+                zeros(n_s, n_s, T_obs),  # Sigma_tgt
+                zeros(n_s, n_s, T_obs),  # Sigma_tgT
+                zeros(n_s, T_obs),   # s (structural shocks)
+                zeros(n_obs, T_obs), # m (measurement errors)
+            )
+        end
         return smoother_output
     end
 end

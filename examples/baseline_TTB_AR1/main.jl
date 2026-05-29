@@ -44,9 +44,11 @@ m_par = BASEforHANK.Flatten.reconstruct(m_par, par_prior);
 e_set = BASEforHANK.e_set;
 
 # set some paths
-@set! e_set.save_mode_file = paths["bld_example"] * "/HANK_mode.jld2";
-@set! e_set.save_posterior_file = paths["bld_example"] * "/HANK_chain.jld2";
-@set! e_set.mode_start_file = paths["src_example"] * "/Data/par_final_dict.txt";
+@set! e_set.save_mode_file = paths["bld_example"] * "/HANK_AR1_mode.jld2";
+@set! e_set.save_posterior_file = paths["bld_example"] * "/HANK_AR1_chain.jld2";
+# par_final_dict.txt contains θ_π = 0.768 (below Taylor-principle boundary of 1.0 → BK alarm).
+# Start fresh from prior mode instead, with the corrected θ_π prior below.
+# @set! e_set.mode_start_file = paths["src_example"] * "/Data/par_final_dict.txt";
 @set! e_set.data_file = paths["src_example"] * "/Data/GER_growth.csv";
 
 # fix seed for random number generation
@@ -57,10 +59,10 @@ BASEforHANK.Random.seed!(e_set.seed);
 ## ------------------------------------------------------------------------------------------
 
 # steady state at the prior mode
-@time ss_full = call_find_steadystate(m_par);
+ss_full = call_find_steadystate(m_par);
 
 # sparse DCT representation
-@time sr_full = call_prepare_linearization(ss_full, m_par);
+sr_full = call_prepare_linearization(ss_full, m_par);
 
 # save the steady state
 jldsave(paths["bld_example"] * "/steadystate.jld2", true; sr_full);
@@ -71,6 +73,8 @@ B = exp.(sr_full.XSS[sr_full.indexes.BSS]);
 Bgov = exp.(sr_full.XSS[sr_full.indexes.BgovSS]);
 Y = exp.(sr_full.XSS[sr_full.indexes.YSS]);
 T10W = exp(sr_full.XSS[sr_full.indexes.TOP10WshareSS]);
+B50W = exp(sr_full.XSS[sr_full.indexes.BOT50WshareSS]);
+B50I = exp(sr_full.XSS[sr_full.indexes.BOT50IshareSS]);
 G = exp.(sr_full.XSS[sr_full.indexes.GSS]);
 fr_borr = BASEforHANK.eval_cdf(sr_full.distrSS, :b, sr_full.n_par, 0.0);
 
@@ -83,6 +87,8 @@ pretty_table(
         "Government Debt to Output Ratio" Bgov / Y/4.0
         "Government Spending to Output Ratio" G/Y
         "TOP 10 Wealth Share" T10W
+        "BOT 50 Wealth Share" B50W
+        "BOT 50 Income Share" B50I
         "Fraction of Borrower" fr_borr
     ];
     header = ["Variable", "Value"],
@@ -123,12 +129,70 @@ if e_set.estimate_model == true
     er_mode, posterior_mode, smoother_mode, sr_mode, lr_mode, m_par_mode =
         find_mode(sr_reduc, lr_reduc, m_par, e_set)
 
-    # Adjust starting values for MCMC sampling to proportional 1% steps
-    hank_start_vals = er_mode.par_final
-    step_sizes = (abs.(hank_start_vals) .* 0.01) .+ 1e-4
-    variances = step_sizes .^ 2
-    hessian_diag = 1.0 ./ variances # Invert to create the Hessian and inject it into er_mode
-    @set! er_mode.hessian_final = Matrix(Diagonal(hessian_diag))
+    # Save the Hessian from mode finding BEFORE overwriting it for MCMC proposals.
+    # If compute_hessian = true: hessian_at_mode is the true numerical Hessian at the
+    # posterior mode → use inv(hessian_at_mode) for Laplace-approximation posterior SDs.
+    # If compute_hessian = false: this is just the identity (not useful for Laplace approx).
+    hessian_at_mode = copy(er_mode.hessian_final)
+
+    # Set MCMC proposal covariance.
+    # If compute_hessian = true: use the true Hessian (captures parameter correlations,
+    # keeps correlated proposals within BK-feasible region → better acceptance rate).
+    # If compute_hessian = false: fall back to diagonal approximation.
+    if e_set.compute_hessian
+        # Build a usable proposal covariance from the finite-difference Hessian.
+        #
+        # Two sources of bad eigenvalues:
+        #   (A) Alarm contamination: FD probes cross the BK boundary → entries O(9e23).
+        #       These inflate max|λ|, making ε_floor = 1e-6*max ≈ 9e17, which blindly
+        #       floors ALL genuine eigenvalues (O(1–1e4)) to that value → tiny proposals.
+        #   (B) Genuine non-identification: likelihood flat in some direction → eigenvalue
+        #       near zero but not alarm-contaminated → should get prior-scale proposal.
+        #
+        # Strategy:
+        #   1. Separate alarm-contaminated eigenvalues (|λ| > 1e18) from genuine ones.
+        #   2. Floor genuine eigenvalues with ε_floor based only on the genuine maximum.
+        #   3. Replace alarm-contaminated eigenvalues with prior-scale curvature (= 100,
+        #      i.e. 1/prior_std² for prior_std ≈ 0.1) so MCMC can still explore those
+        #      directions at prior-reasonable step sizes.
+        H_sym = Symmetric(er_mode.hessian_final)
+        F = eigen(H_sym)
+
+        # alarm/h² threshold: alarm ≈ 9e15, h = 1e-4  →  9e15/1e-8 = 9e23.
+        # Use 1e18 as conservative boundary between genuine curvature and alarm artifact.
+        alarm_ev_threshold = 1e18
+        is_alarm = abs.(F.values) .> alarm_ev_threshold
+        n_alarm  = sum(is_alarm)
+
+        genuine_max = maximum(abs.(F.values[.!is_alarm]); init = 1.0)
+        ε_floor = max(1e-4, 1e-6 * genuine_max)   # floor only genuine directions
+
+        # Replace alarm directions with prior-scale curvature so proposals are bounded.
+        prior_scale_ev = 100.0   # 1/0.1² — conservative: prior_std ≈ 0.1 for most params
+        ev_proposal = copy(F.values)
+        ev_proposal[is_alarm]  .= prior_scale_ev
+        ev_proposal             .= max.(ev_proposal, ε_floor)
+
+        n_floored = sum(F.values[.!is_alarm] .< ε_floor)
+        if n_alarm > 0
+            @printf "Hessian: %d alarm-contaminated direction(s) → replaced with prior-scale (%.1f).\n" n_alarm prior_scale_ev
+        end
+        if n_floored > 0
+            @printf "Hessian: flooring %d near-zero eigenvalue(s) at %.2e.\n" n_floored ε_floor
+        end
+        H_pd = Symmetric(F.vectors * Diagonal(ev_proposal) * F.vectors')
+        @set! er_mode.hessian_final = Matrix(H_pd)
+        @printf "Using true Hessian from mode finding for MCMC proposals.\n"
+    else
+        # Diagonal fallback: 1% of parameter value, with 1e-4 floor
+        # NOTE: breaks for near-zero parameters (γ_π, γ_Y, γ_Yτ) → see comments in
+        # filter_smoother.jl for the step-size fix if MCMC AR collapses
+        hank_start_vals = er_mode.par_final
+        step_sizes = (abs.(hank_start_vals) .* 0.01) .+ 1e-4
+        variances = step_sizes .^ 2
+        hessian_diag = 1.0 ./ variances
+        @set! er_mode.hessian_final = Matrix(Diagonal(hessian_diag))
+    end
 
     # Only relevant output for later plotting will be saved.
     # If you require all smoother output including the variance estimates
@@ -256,7 +320,7 @@ shocks_to_plot = [
     #(:μw, "Wage markup"),
     #(:A, "Risk premium"),
     #(:Rshock, "Mon. policy"),
-    (:Gshock, "Structural deficit"),
+    #(:Gshock, "Structural deficit"),
     (:GI, "Gov. Investment shock"),
     #(:Tprogshock, "Tax progr."),
     #(:Sshock, "Income risk"),
@@ -293,6 +357,7 @@ plot_irfs(
     [(IRFs_mc, "Posterior mean"), (IRFs_mode, "Mode")],
     IRFs_order,
     sr_mc.indexes_r;
+    horizon,
     show_fig = false,
     save_fig = true,
     path = paths["bld_example"] * "/IRFs",
@@ -303,9 +368,9 @@ plot_irfs(
 mkpath(paths["bld_example"] * "/IRFs_cat");
 plot_irfs_cat(
     Dict(
-        ("Monetary", "mon") => [:Rshock, :A],
+        #("Monetary", "mon") => [:Rshock, :A],
         ("Fiscal", "fis") => [:Gshock, :GI], # :Tprogshock,
-        ("Productivity", "pro") => [:TFP, :ZI, :μ, :μw],
+        #("Productivity", "pro") => [:TFP, :ZI, :μ, :μw],
     ),
     vars_to_plot,
     IRFs_mc,
@@ -318,88 +383,88 @@ plot_irfs_cat(
     style_options = (lw = 2, color = [:blue, :red, :green, :orange], linestyle = [:solid, :dash, :dot]),
 )
 
-mkpath(paths["bld_example"] * "/VDs");
-plot_vardecomp(
-    vars_to_plot,
-    [(VDs_mc, "Posterior mean"), (VDs_mode, "Mode")],
-    IRFs_order,
-    sr_mc.indexes_r;
-    show_fig = false,
-    save_fig = true,
-    path = paths["bld_example"] * "/VDs",
-)
+# mkpath(paths["bld_example"] * "/VDs");
+# plot_vardecomp(
+#     vars_to_plot,
+#     [(VDs_mc, "Posterior mean"), (VDs_mode, "Mode")],
+#     IRFs_order,
+#     sr_mc.indexes_r;
+#     show_fig = false,
+#     save_fig = true,
+#     path = paths["bld_example"] * "/VDs",
+# )
 
-mkpath(paths["bld_example"] * "/VDs_cat");
-plot_vardecomp(
-    vars_to_plot,
-    [(VDs_mc, "Posterior mean"), (VDs_mode, "Mode")],
-    IRFs_order,
-    sr_mc.indexes_r;
-    shock_categories = Dict(
-        ("Monetary", "mon") => [:Rshock, :A],
-        ("Fiscal", "fis") => [:Gshock, :GI], # :Tprogshock,
-        ("Productivity", "pro") => [:TFP, :ZI, :μ, :μw],
-    ),
-    show_fig = false,
-    save_fig = true,
-    path = paths["bld_example"] * "/VDs_cat",
-)
+# mkpath(paths["bld_example"] * "/VDs_cat");
+# plot_vardecomp(
+#     vars_to_plot,
+#     [(VDs_mc, "Posterior mean"), (VDs_mode, "Mode")],
+#     IRFs_order,
+#     sr_mc.indexes_r;
+#     shock_categories = Dict(
+#         ("Monetary", "mon") => [:Rshock, :A],
+#         ("Fiscal", "fis") => [:Gshock, :GI], # :Tprogshock,
+#         ("Productivity", "pro") => [:TFP, :ZI, :μ, :μw],
+#     ),
+#     show_fig = false,
+#     save_fig = true,
+#     path = paths["bld_example"] * "/VDs_cat",
+# )
 
-mkpath(paths["bld_example"] * "/VDbcs");
-plot_vardecomp_bcfreq(
-    vars_to_plot,
-    [(VDbcs_mc, "Posterior mean"), (VDbcs_mode, "Mode")],
-    IRFs_order,
-    sr_mc.indexes_r;
-    show_fig = false,
-    save_fig = true,
-    path = paths["bld_example"] * "/VDbcs",
-)
+# mkpath(paths["bld_example"] * "/VDbcs");
+# plot_vardecomp_bcfreq(
+#     vars_to_plot,
+#     [(VDbcs_mc, "Posterior mean"), (VDbcs_mode, "Mode")],
+#     IRFs_order,
+#     sr_mc.indexes_r;
+#     show_fig = false,
+#     save_fig = true,
+#     path = paths["bld_example"] * "/VDbcs",
+# )
 
-mkpath(paths["bld_example"] * "/VDbcs_cat");
-plot_vardecomp_bcfreq(
-    vars_to_plot,
-    [(VDbcs_mc, "Posterior mean"), (VDbcs_mode, "Mode")],
-    IRFs_order,
-    sr_mc.indexes_r;
-    shock_categories = Dict(
-        ("Monetary", "mon") => [:Rshock, :A],
-        ("Fiscal", "fis") => [:Gshock, :GI], # :Tprogshock,
-        ("Productivity", "pro") => [:TFP, :ZI, :μ, :μw],
-    ),
-    show_fig = false,
-    save_fig = true,
-    path = paths["bld_example"] * "/VDbcs_cat",
-)
+# mkpath(paths["bld_example"] * "/VDbcs_cat");
+# plot_vardecomp_bcfreq(
+#     vars_to_plot,
+#     [(VDbcs_mc, "Posterior mean"), (VDbcs_mode, "Mode")],
+#     IRFs_order,
+#     sr_mc.indexes_r;
+#     shock_categories = Dict(
+#         ("Monetary", "mon") => [:Rshock, :A],
+#         ("Fiscal", "fis") => [:Gshock, :GI], # :Tprogshock,
+#         ("Productivity", "pro") => [:TFP, :ZI, :μ, :μw],
+#     ),
+#     show_fig = false,
+#     save_fig = true,
+#     path = paths["bld_example"] * "/VDbcs_cat",
+# )
 
-mkpath(paths["bld_example"] * "/HDs");
-plot_hist_decomp(
-    vars_to_plot,
-    ShockContr,
-    ShockContr_order,
-    sr_mc.indexes_r;
-    timeline = collect(1991.25:0.25:2025.75),
-    show_fig = false,
-    save_fig = true,
-    path = paths["bld_example"] * "/HDs",
-);
+# mkpath(paths["bld_example"] * "/HDs");
+# plot_hist_decomp(
+#     vars_to_plot,
+#     ShockContr,
+#     ShockContr_order,
+#     sr_mc.indexes_r;
+#     timeline = collect(1991.25:0.25:2025.75),
+#     show_fig = false,
+#     save_fig = true,
+#     path = paths["bld_example"] * "/HDs",
+# );
 
-mkpath(paths["bld_example"] * "/HDs_cat");
-plot_hist_decomp(
-    vars_to_plot,
-    ShockContr,
-    ShockContr_order,
-    sr_mc.indexes_r;
-    shock_categories = Dict(
-        ("Monetary", "mon") => [:Rshock, :A],
-        ("Fiscal", "fis") => [:Gshock, :GI], # :Tprogshock,
-        ("Productivity", "pro") => [:TFP, :ZI, :μ, :μw],
-    ),
-    timeline = collect(1991.25:0.25:2025.75),
-    show_fig = false,
-    save_fig = true,
-    path = paths["bld_example"] * "/HDs_cat",
-);
+# mkpath(paths["bld_example"] * "/HDs_cat");
+# plot_hist_decomp(
+#     vars_to_plot,
+#     ShockContr,
+#     ShockContr_order,
+#     sr_mc.indexes_r;
+#     shock_categories = Dict(
+#         ("Monetary", "mon") => [:Rshock, :A],
+#         ("Fiscal", "fis") => [:Gshock, :GI], # :Tprogshock,
+#         ("Productivity", "pro") => [:TFP, :ZI, :μ, :μw],
+#     ),
+#     timeline = collect(1991.25:0.25:2025.75),
+#     show_fig = false,
+#     save_fig = true,
+#     path = paths["bld_example"] * "/HDs_cat",
+# );
 
 # Print cumulative mutipliers
 println("\n--- Cumulative PV Multipliers: Public Investment (AR1 - Model) ---")

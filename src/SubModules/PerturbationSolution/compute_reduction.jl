@@ -67,6 +67,12 @@ function compute_reduction(sr, lr, m_par, shock_names)
     Vindex = [sr.indexes.valueFunction.b; sr.indexes.valueFunction.k]
     evalC, evecC = eigen(ControlCOVAR[Vindex .- n_par.nstates, Vindex .- n_par.nstates])
     keepV = abs.(evalC) .> maximum(evalC) * n_par.further_compress_critC
+    if sum(keepV) < 2  # guard: need ≥ 2 for the [1:2] b-VF split in produce_indexes below;
+                       # capital-VF (k) can legitimately be 0 factors — handled at block_r[5]
+        perm = sortperm(abs.(evalC), rev = true)
+        keepV .= false
+        keepV[perm[1:min(2, length(perm))]] .= true
+    end
     indKeepV = Vindex[keepV]
     @set! n_par.ncontrols_r = n_par.ncontrols - length(Vindex) + length(indKeepV)
 
@@ -106,7 +112,12 @@ function compute_reduction(sr, lr, m_par, shock_names)
     block_r[2] = [indexes_r.distr.b; indexes_r.distr.k; indexes_r.distr.h]
     block_r[3] = (indexes_r.distr.h[end] + 1):(indexes_r.valueFunction.b[1] - 1)
     block_r[4] = [indexes_r.valueFunction.b; indexes_r.valueFunction.k]
-    block_r[5] = (indexes_r.valueFunction.k[end] + 1):(n_par.ntotal_r)
+    # valueFunction.k can be empty when capital-VF PCA collapses (e.g. near-zero ζ means
+    # capital VF barely responds to aggregate shocks). Fall back to end of b-VF in that case.
+    last_vf_r = isempty(indexes_r.valueFunction.k) ?
+        indexes_r.valueFunction.b[end] :
+        indexes_r.valueFunction.k[end]
+    block_r[5] = (last_vf_r + 1):(n_par.ntotal_r)
     RedCOP = Aux[block[1], block_r[1]]
     RedVs = Aux[block[4], block_r[4]]
     @set! n_par.PRightAll = BlockDiagonal([

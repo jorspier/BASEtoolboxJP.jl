@@ -10,6 +10,7 @@
 #   5. Compute averages for targets/ calibration
 ### -------------------------------------------
 
+
 library(rdbnomics)
 library(dplyr)
 library(tidyr)
@@ -18,6 +19,8 @@ library(RJDemetra)
 library(readr)
 library(wid)
 library(rvest)
+library(readxl)
+library(zoo)
 
 ### ---------- 1. Download raw data ------------
 ## Government Consumption
@@ -107,7 +110,7 @@ euribor_raw <- euribor_raw %>%
 
 ## Splice Wu-Xia ECB shadow rate from 2009Q1 (as in Bayer et al.) to Aug 2022
 # Shadow rate captures true monetary policy stance during ZLB/unconventional policy period
-shadow_raw <- read_csv("examples/shadowrate_ECB.csv",
+shadow_raw <- read_csv("./examples/Data/shadowrate_ECB.csv",
                        col_names = c("yyyymm", "shadow_rate"),
                        col_types = cols(yyyymm = col_character(), shadow_rate = col_double()))
 
@@ -141,11 +144,10 @@ pop <- pop_tsd %>%
         period = yq(time)) %>% # from thousand to person
     select(period, population)
 
-# fill missing quarters before 2005 (currently same value from Q2 onwards)
+# linear interpolate missing quarters before 2005
 pop <- pop %>%
     complete(period = seq.Date(as.Date("1991-01-01"), max(pop$period), by = "quarter")) %>%
-    fill(population, .direction = "down") %>%
-    fill(population, .direction = "up")
+    mutate(population = zoo::na.approx(population, na.rm = FALSE))
 
 
 ## Top 10% income share
@@ -176,6 +178,33 @@ T10Wshare <- download_wid(indicator = "shweal",
 T10Wshare <- T10Wshare %>%
     mutate(year = as.Date(paste0(year, "-01-01"))) %>%
     rename(period = year)
+
+## Bottom 50% income share
+B50Ishare <- download_wid(indicator = "sptinc", 
+                            perc = "p0p50",
+                            areas = "DE",
+                            pop = "j", # equal split adults
+                            ages = "999") %>%
+                            filter(year >= 1991) %>%
+                            select(year, value) %>%
+                            rename(B50Ishare = value)
+B50Ishare <- B50Ishare %>%
+    mutate(year = as.Date(paste0(year, "-01-01"))) %>%
+    rename(period = year)
+
+## Bottom 50% wealth share
+B50Wshare <- download_wid(indicator = "shweal", 
+                            perc = "p0p50",
+                            areas = "DE", 
+                            pop = "j", # equal split adults
+                            ages = "999") %>%
+                            filter(year >= 1991) %>%
+                            select(year, value) %>%
+                            rename(B50Wshare = value)
+
+B50Wshare <- B50Wshare %>%
+    mutate(year = as.Date(paste0(year, "-01-01"))) %>%
+    rename(period = year) 
 
 ## Income Gini
 # Pre-tax income
@@ -234,6 +263,8 @@ master <- gdp_nom %>%
     left_join(deflator_raw, by = "period") %>%
     left_join(T10Ishare, by = "period") %>%
     left_join(T10Wshare, by = "period") %>%
+    left_join(B50Ishare, by = "period") %>%
+    left_join(B50Wshare, by = "period") %>%
     left_join(GiniGrossInc, by = "period") %>%
     left_join(GiniNetInc, by = "period") %>%
     left_join(GiniWealth, by = "period") %>%
@@ -244,8 +275,9 @@ master_real <- master %>%
         , ~ .x / (deflator / 100))) %>%
     mutate(wages = (wages / hours) / (deflator / 100)) %>%
     select(period, gdp, cons_gov, cons_priv, inv_gov, inv_priv, 
-        wages, hours, interest, population, deflator, T10Ishare, 
-        T10Wshare, GiniGrossInc, GiniNetInc, GiniWealth)
+        wages, hours, interest, population, deflator, 
+        T10Ishare, T10Wshare, B50Ishare, B50Wshare, 
+        GiniGrossInc, GiniNetInc, GiniWealth)
 
 
 ### ---------- Seasonal & calendar adjustment ------------
@@ -323,12 +355,15 @@ master_growth <- master_pc %>%
         RB       = interest / 4,
         TOP10Ishare = log(T10Ishare),
         TOP10Wshare = log(T10Wshare),
+        B50Ishare = log(B50Ishare),
+        B50Wshare = log(B50Wshare),
         GiniGrossInc = log(GiniGrossInc),
         GiniNetInc  = log(GiniNetInc),
         GiniWealth  = log(GiniWealth)
     ) %>%
     select(period, Ygrowth, GCgrowth, Cgrowth, GIgrowth, Igrowth, 
-        wgrowth, N, pi, RB, TOP10Ishare, TOP10Wshare, GiniGrossInc, GiniNetInc, GiniWealth)
+        wgrowth, N, pi, RB, TOP10Ishare, TOP10Wshare, B50Ishare, B50Wshare, 
+        GiniGrossInc, GiniNetInc, GiniWealth)
 
 ## Compte TS averages
 master_growth_avg <- master_growth %>%
@@ -344,6 +379,8 @@ master_growth_avg <- master_growth %>%
         RB_avg      = mean(RB, na.rm = TRUE),
         TOP10Ishare_avg = mean(TOP10Ishare, na.rm = TRUE),
         TOP10Wshare_avg = mean(TOP10Wshare, na.rm = TRUE),
+        B50Ishare_avg = mean(B50Ishare, na.rm = TRUE),
+        B50Wshare_avg = mean(B50Wshare, na.rm = TRUE),
         GiniGrossInc_avg = mean(GiniGrossInc, na.rm = TRUE),
         GiniNetInc_avg = mean(GiniNetInc, na.rm = TRUE),
         GiniWealth_avg = mean(GiniWealth, na.rm = TRUE)
@@ -362,29 +399,36 @@ master_growth_stationary <- master_growth %>%
         RB      = RB - master_growth_avg$RB_avg,
         TOP10Ishare = TOP10Ishare - master_growth_avg$TOP10Ishare_avg,
         TOP10Wshare = TOP10Wshare - master_growth_avg$TOP10Wshare_avg,
+        B50Ishare = B50Ishare - master_growth_avg$B50Ishare_avg,
+        B50Wshare = B50Wshare - master_growth_avg$B50Wshare_avg,
         GiniGrossInc = GiniGrossInc - master_growth_avg$GiniGrossInc_avg,
         GiniNetInc  = GiniNetInc - master_growth_avg$GiniNetInc_avg,
         GiniWealth  = GiniWealth - master_growth_avg$GiniWealth_avg
     ) %>%
     select(period, Ygrowth, GCgrowth, Cgrowth, GIgrowth, Igrowth, wgrowth, 
-        N, pi, RB, TOP10Ishare, TOP10Wshare, GiniGrossInc, GiniNetInc, GiniWealth)
+        N, pi, RB, TOP10Ishare, TOP10Wshare, B50Ishare, B50Wshare,
+        GiniGrossInc, GiniNetInc, GiniWealth)
 
 
 ## save as csv
-write_csv(master_growth_stationary, "examples/baseline_TTB_10Y/Data/GER_growth.csv", na = "NaN")
+write_csv(master_growth_stationary, "examples/Data/GER_growth.csv", na = "NaN")
 
 ## ----------------------------------------------------------
 ## ------ 5. Retrieve averages for targets/ calibration -----
 ## ----------------------------------------------------------
 
 # Top 10% shares
-T10Iavg <- mean(master_pc$T10Ishare, na.rm = TRUE)
-T10Wavg <- mean(master_pc$T10Wshare, na.rm = TRUE)
+T10Iavg <- mean(master$T10Ishare, na.rm = TRUE)
+T10Wavg <- mean(master$T10Wshare, na.rm = TRUE)
+
+# Bottom 50% shares
+B50Iavg <- mean(master$B50Ishare, na.rm = TRUE)
+B50Wavg <- mean(master$B50Wshare, na.rm = TRUE)
 
 # Income and wealth inequality (Gini)
-GiniGrossInc_avg <- mean(master_pc$GiniGrossInc, na.rm = TRUE)
-GiniNetInc_avg <- mean(master_pc$GiniNetInc, na.rm = TRUE)
-GiniWealth_avg <- mean(master_pc$GiniWealth, na.rm = TRUE)
+GiniGrossInc_avg <- mean(master$GiniGrossInc, na.rm = TRUE)
+GiniNetInc_avg <- mean(master$GiniNetInc, na.rm = TRUE)
+GiniWealth_avg <- mean(master$GiniWealth, na.rm = TRUE)
 
 # Government spending shares
 GCshare_avg <- mean(master_pc$cons_gov_pc / master_pc$gdp_pc, na.rm = TRUE)
@@ -404,8 +448,6 @@ evs_ger <- evs_ger[-c(1,2),]
 
 names(evs_ger) <- c("category", "2008", "2013", "2018", "2023")
 
-#clean_num <- function(x) as.numeric(gsub("[^0-9]", "", x)) # remove thousands numerator
-
 evs_ger <- evs_ger %>%
     mutate(
     across(
@@ -413,7 +455,7 @@ evs_ger <- evs_ger %>%
       ~ parse_number(.)
     ))
 
-# Matching the modelin strategy, I use NET financial assets
+# Matching the modeling strategy, I use NET financial assets
 #   & GROSS illiquid assets (current market values) since there are no mortgages
 # Note: only 4 data points with strong linear trend 
 
@@ -428,55 +470,124 @@ evs_ger <- evs_ger %>%
     bind_rows(bind_cols(category = "Asset ratio", net_fin / curr_mkt))
 
 BK_avg <- mean(as.numeric(evs_ger[10, 2:5]))
-
 ## Debt to GDP (1995-2024)
 BgovY <- rdb(ids = "Eurostat/gov_10dd_edpt1/A.PC_GDP.S13.GD.DE") %>%
     select(period, value)
 
 BgovY_avg = mean(BgovY$value, na.rm = TRUE)
 
-## Depreciation rate
-# consumption of fixed capital (non-financial sectors)
-cfc <- rdb(ids = "Eurostat/naidsa_10_nf_tr/A.CP_MEUR.PAID.P51C.S11.DE")%>%
+
+## Capital output ratio
+capital <- "./examples/Data/sektorale-und-gesamtwirtschaftliche-vermoegensbilanzen-xls-data.xlsx"
+
+read_anlagevermoegen <- function(sheet, row) {
+  # Read year headers (row 4) and data row separately
+  years  <- read_excel(capital, sheet = sheet, col_names = FALSE,
+                       range = paste0("C4:AB4")) |>
+            unlist() |> as.integer()
+  values <- read_excel(capital, sheet = sheet, col_names = FALSE,
+                       range = paste0("C", row, ":AB", row)) |>
+            unlist() |> as.numeric()
+  tibble(period = as.Date(paste0(years, "-01-01")), value = values)
+}
+
+K_S1 <- read_anlagevermoegen("S1 + S 11", row = 8) %>% # total
+    mutate(value = value * 1e9) # from billion to euro
+K_S11 <- read_anlagevermoegen("S1 + S 11", row = 29) %>% # non-financial corporations
+    mutate(value = value * 1e9)
+K_S12 <- read_anlagevermoegen("S 12 + S 13", row = 8) %>% # financial
+    mutate(value = value * 1e9)
+K_S13 <- read_anlagevermoegen("S 12 + S 13", row = 32) %>% # government
+    mutate(value = value * 1e9)
+K_S14_15 <- read_anlagevermoegen("S 14 + S 15", row = 8) %>% # HH + non-profits
+    mutate(value = value * 1e9)
+
+K_S14_15_residential <- read_anlagevermoegen("S 14 + S 15", row = 10) %>% # HH + non-profits
+    mutate(value = value * 1e9)
+
+K_S14_15_nonresidential <- K_S14_15 %>%
+    inner_join(K_S14_15_residential, by = "period", suffix = c("_total", "_res")) %>%
+    mutate(value = value_total - value_res) %>%
     select(period, value)
 
-# gross fixed capital stock: remove financial, residential, public sector etc.
-gfcs_tot <- rdb(ids = "Eurostat/nama_10_nfa_st/A.CRC_MEUR.TOTAL.N11G.DE")
-gfcs_K <- rdb(ids = "Eurostat/nama_10_nfa_st/A.CRC_MEUR.K.N11G.DE") # finance
-gfcs_L <- rdb(ids = "Eurostat/nama_10_nfa_st/A.CRC_MEUR.L.N11G.DE") # real estate
-gfcs_OQ <- rdb(ids = "Eurostat/nama_10_nfa_st/A.CRC_MEUR.O-Q.N11G.DE") # public sector
-gfcs_RU <- rdb(ids = "Eurostat/nama_10_nfa_st/A.CRC_MEUR.R-U.N11G.DE") # arts & entertainment
+K_priv_nr <- K_S11 %>%
+    inner_join(K_S14_15_nonresidential, by = "period", suffix = c("_nf", "_hh")) %>%
+    arrange(period) %>%
+    mutate(value = value_nf + value_hh) %>%
+    select(period, value)
+     
+K_ngov <- K_S1 %>%
+    inner_join(K_S13, by = "period", suffix = c("_tot", "_gov")) %>% #includes financial sector
+    arrange(period) %>%
+    mutate(value = value_tot - value_gov) %>%
+    select(period, value)
 
-gfcs_excl <- bind_rows(gfcs_K, gfcs_L, gfcs_OQ, gfcs_RU) %>%
-  group_by(period) %>%
-  summarise(value_excl = sum(value, na.rm = TRUE))
+K_firm <- K_S11 %>%
+    inner_join(K_S12, by = "period", suffix = c("_nf", "_f")) %>%
+    arrange(period) %>%
+    mutate(value = value_nf + value_f) %>%
+    select(period, value)
 
-gfcs_nf <- gfcs_tot %>%
-  inner_join(gfcs_excl, by = "period") %>%
-  mutate(value = value - value_excl) %>%
-  select(period, value)
+GDP_tot <- rdb(ids = "Eurostat/NAMA_10_GDP/A.CP_MEUR.B1GQ.DE") %>%
+    select(period, value) %>%
+    filter(period >= as.Date("1999-01-01")) %>%
+    mutate(value = value * 1e6) # from million to euro
 
+KY_tot <- mean(K_S1$value, na.rm = TRUE) / mean(GDP_tot$value, na.rm = TRUE)
+KY_priv <- mean(K_priv_nr$value, na.rm = TRUE) / mean(GDP_tot$value, na.rm = TRUE)
+KY_ngov <- mean(K_ngov$value, na.rm = TRUE) / mean(GDP_tot$value, na.rm = TRUE)
+KY_gov <- mean(K_S13$value, na.rm = TRUE) / mean(GDP_tot$value, na.rm = TRUE)
+0.
+KY_nfc <- mean(K_S11$value, na.rm = TRUE) / mean(GDP_tot$value, na.rm = TRUE)
+## Depreciation rate
+# consumption of fixed capital
+cfc_tot <- rdb(ids = "Eurostat/nasa_10_nf_tr/A.CP_MEUR.PAID.P51C.S1.DE")%>%
+    select(period, value) %>%
+    mutate(value = value * 1e6) # from million to euro
+
+cfc_nf <- rdb(ids = "Eurostat/nasa_10_nf_tr/A.CP_MEUR.PAID.P51C.S11.DE")%>%
+    select(period, value) %>%
+    mutate(value = value * 1e6) # from million to euro
+
+cfc_gov <- rdb(ids = "Eurostat/naidsa_10_nf_tr/A.CP_MEUR.PAID.P51C.S13.DE") %>%
+    select(period, value) %>%
+    mutate(value = value * 1e6) # from million to euro
+
+cfc_hh <- rdb(ids = "Eurostat/nasa_10_nf_tr/A.CP_MEUR.PAID.P51C.S14_S15.DE")%>%
+    select(period, value) %>%
+    mutate(value = value * 1e6) # from million to euro
+
+cfc_priv <- cfc_hh %>%
+    inner_join(cfc_nf, by = "period", suffix = c("_hh", "_nf")) %>%
+    mutate(value = value_hh + value_nf)
+
+cfc_ngov <- cfc_tot %>%
+    inner_join(cfc_gov, by = "period", suffix = c("_tot", "_gov")) %>%
+    arrange(period) %>%
+    mutate(value = value_tot - value_gov) %>%
+    select(period, value)
+
+cfc_firm <- cfc_tot %>%
+    inner_join(cfc_gov, by = "period", suffix = c("_tot", "_gov")) %>%
+    inner_join(cfc_hh, by = "period", suffix = c("", "_hh")) %>%
+    mutate(value = value_tot - value_gov - value) %>%
+    select(period, value)
 
 # Depreciation rate = consumption of fixed capital / (capital stock_t + capital stock _{t-1})/2
-depr <- cfc %>%
-  inner_join(gfcs_nf, by = "period", suffix = c("_cfc", "_gfcs")) %>%
+depr <- K_priv_nr %>%
+  inner_join(cfc_nf, by = "period", suffix = c("_gfcs", "_cfc")) %>%
   arrange(period) %>%
+  filter(period >= as.Date("1999-01-01")) %>% 
   mutate(avg_stock = (value_gfcs + lag(value_gfcs)) / 2,
          depreciation_rate = value_cfc / avg_stock)
 
 depr_avg = mean(depr$depreciation_rate, na.rm = TRUE)
 
-depr_q=1-(1-depr_avg)^(0.25)
+depr_q = 1-(1-depr_avg)^(0.25)
 
 ## Depreciation of public capital
-cfc_gov <- rdb(ids = "Eurostat/naidsa_10_nf_tr/A.CP_MEUR.PAID.P51C.S13.DE") %>%
-    select(period, value)
-
-gfcs_OQ <- gfcs_OQ %>%
-    select(period, value)
-
 depr_gov <- cfc_gov %>%
-  inner_join(gfcs_OQ, by = "period", suffix = c("_cfc", "_gfcs")) %>%
+  inner_join(K_S13, by = "period", suffix = c("_cfc", "_gfcs")) %>%
   arrange(period) %>%
   mutate(avg_stock = (value_gfcs + lag(value_gfcs)) / 2,
          depreciation_rate = value_cfc / avg_stock)
@@ -485,13 +596,6 @@ depr_gov_avg = mean(depr_gov$depreciation_rate, na.rm = TRUE)
 
 depr_gov_q = 1-(1-depr_gov_avg)^(0.25)
 
-## Capital output ratio (non-financial firms)
-KY_tot <- rdb(ids = "Eurostat/NAMQ_10_AN6/Q.PC_GDP.N11G.SCA.DE") %>%
-    select(period, value)
-KY_dwellings <- rdb(ids = "Eurostat/NAMQ_10_AN6/Q.PC_GDP.N111G.SCA.DE") %>%
-    select(period, value)
-
-KY <- (mean(KY_tot$value, na.rm = TRUE) - mean(KY_dwellings$value, na.rm = TRUE)) / (depr_q* 100 * 4)
 
 ## Death rate of traded firms 
 # dbnomics misses value for 2023 - A.ENT_DTHR_PC.ENT_LL.B-S_X_O_S94.DE
@@ -511,14 +615,15 @@ iotaPi_q = iotaPi_m / 400
 ## Write averages as table
 averages_table <- data.frame(
     Metric = c("Top 10% Income Share", "Top 10% Wealth Share", 
+                "Bottom 50% Income Share", "Bottom 50% Wealth Share",
                "Gini Gross Income", "Gini Net Income", "Gini Wealth",
                "Government Consumption Share", "Government Investment Share",
                "Real Interest Rate (Q)", "HH Asset ratio", "Debt-to-GDP", 
                "Depreciation Rate (Q)", "Public capital depreciation rate (Q)",
                "Capital Output ratio (Q)", "Firm death rate (Q)"),
-    Average = c(T10Iavg, T10Wavg, GiniGrossInc_avg, GiniNetInc_avg, GiniWealth_avg,
-                GCshare_avg, GIshare_avg, RB_avg, BK_avg, BgovY_avg, depr_q, depr_gov_q, 
-                KY, iotaPi_q)
+    Average = c(T10Iavg, T10Wavg, B50Iavg, B50Wavg, GiniGrossInc_avg, GiniNetInc_avg, 
+                GiniWealth_avg, GCshare_avg, GIshare_avg, RB_avg, BK_avg, BgovY_avg, 
+                depr_q, depr_gov_q, KY_ngov, iotaPi_q)
 )
 
 print(averages_table)

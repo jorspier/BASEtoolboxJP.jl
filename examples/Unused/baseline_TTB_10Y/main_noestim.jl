@@ -100,7 +100,7 @@ transform_elements =
     transformation_elements(sr_full, sr_full.n_par.model, sr_full.n_par.distribution_states); # Γ, DC, IDC, DCD, IDCD
 
 
-correct_init_vals = [sr_full.m_par.σ_Gshock, sr_full.m_par.σ_Auth]
+correct_init_vals = [sr_full.m_par.σ_GI_NS]
     
 IRFs, _, IRFs_order, IRFs_dist = compute_irfs( # IRFs_dist
     exovars,
@@ -118,16 +118,16 @@ IRFs, _, IRFs_order, IRFs_dist = compute_irfs( # IRFs_dist
 );
 
 # Export IRFs
-idx_dict_hank_10Y = Dict{Symbol, Int}(
+idx_dict_hank_10Y_debt = Dict{Symbol, Int}(
     name => getfield(sr_full.indexes, name) 
     for name in fieldnames(typeof(sr_full.indexes)) 
     if getfield(sr_full.indexes, name) isa Int
 )
-jldsave(paths["bld_example"] * "/IRFs_HANK_10Y.jld2", true; 
+jldsave(paths["bld_example"] * "/IRFs_HANK_10Y_debt.jld2", true; 
     IRFs, 
     IRFs_order, 
     IRFs_dist,
-    idx_dict_hank_10Y
+    idx_dict_hank_10Y_debt
 )
 
 # Compute variance decomposition of IRFs
@@ -145,25 +145,15 @@ VDbcs, UnconditionalVar =
 @printf "Plotting...\n"
 
 # Define here once all variables and shocks to plot for all figures 
-horizon = 80; 
+horizon = 100; 
 
-IRFs_order[IRFs_order .== :Auth] .= :GI
+IRFs_order[IRFs_order .== :GI_NS] .= :GI
 
 shocks_to_plot = [
-    #(:Z, "Effective TFP"),
     (:GI, "Gov. Investment"), 
-    #(:TFP, "TFP Shock"),
-    #(:ZI, "Inv.-spec. tech."),
-    #(:μ, "Price markup"),
-    #(:μw, "Wage markup"),
-    #(:A, "Risk premium"),
-    #(:Rshock, "Mon. policy"),
-    (:Gshock, "Structural deficit"),
-    #(:Tprogshock, "Tax progr."),
-    #(:Sshock, "Income risk"),
 ]
 
-vars_to_plot = [
+vars_agg = [
     (:Y, "Output"), # removed growth
     (:C, "Consumption"),
     (:Bgov, "Gov. Debt"),
@@ -174,23 +164,26 @@ vars_to_plot = [
     (:wF, "Wage"),
     (:π, "Inflation"),
     (:RB, "Nominal rate"),
-    (:Tbar, "Average Tax Rate"),
-    (:T, "Net Tax Revenue"),
+    (:T, "Tax Revenue"),
     (:TR, "Transfers"),
-    #(:σ, "Income risk"),
-    #(:Tprog, "Tax progressivity"),
-    #(:TOP10Wshare, "Top 10 wealth share"),
-    #(:TOP10Ishare, "Top 10 gross inc. share"),
-    #(:TOP10Inetshare, "Top 10 net inc. share"),
-    (:GiniW, "Wealth Gini"),
-    (:GiniC, "Consumption Gini") 
 ];
 
+vars_dist = [
+    (:GiniC, "Consumption Gini"),
+    (:GiniI, "Pre-tax Income Gini"),
+    (:GiniInet, "Net Income Gini"),
+    (:GiniW, "Wealth Gini"),
+    (:TOP10Ishare, "Top 10 pre-tax inc. share"),
+    (:TOP10Inetshare, "Top 10 net inc. share"),
+    (:TOP10Wshare, "Top 10 wealth share"),
+    (:sdlogy, "Std. log income")
+]
+
 # IRFs
-mkpath(paths["bld_example"] * "/IRFs");
+mkpath(paths["bld_example"] * "/IRFs_agg");
 plot_irfs(
     shocks_to_plot,
-    vars_to_plot,
+    vars_agg,
     [(IRFs, "10Y HANK")],
     IRFs_order,
     sr_full.indexes;
@@ -198,86 +191,102 @@ plot_irfs(
     save_fig_indiv = false,
     show_fig = false,
     save_fig = true,
-    path = paths["bld_example"] * "/IRFs",
+    path = paths["bld_example"] * "/IRFs_agg",
     yscale = "standard",
     style_options = (lw = 2, color = [:blue, :red], linestyle = [:solid, :dash]),
 );
 
-mkpath(paths["bld_example"] * "/IRFs_cat");
-plot_irfs_cat(
-    Dict(
-        #("Monetary", "mon") => [:Rshock, :A],
-        ("Fiscal", "fis") => [:Gshock, :GI], # :Tprogshock
-        #("Productivity", "pro") => [:TFP, :ZI, :μ, :μw],
-    ),
-    vars_to_plot,
-    IRFs,
+mkpath(paths["bld_example"] * "/IRFs_dist");
+plot_irfs(
+    shocks_to_plot,
+    vars_dist,
+    [(IRFs, "10Y HANK")],
     IRFs_order,
     sr_full.indexes;
     horizon,
+    save_fig_indiv = false,
     show_fig = false,
     save_fig = true,
-    path = paths["bld_example"] * "/IRFs_cat",
+    path = paths["bld_example"] * "/IRFs_dist",
     yscale = "standard",
-    style_options = (lw = 2, color = [:blue, :red, :green, :orange], linestyle = [:solid, :dash, :dot]),
+    style_options = (lw = 2, color = [:blue, :red], linestyle = [:solid, :dash]),
 );
 
+# mkpath(paths["bld_example"] * "/IRFs_cat");
+# plot_irfs_cat(
+#     Dict(
+#         #("Monetary", "mon") => [:Rshock, :A],
+#         ("Fiscal", "fis") => [:Gshock, :GI], # :Tprogshock
+#         #("Productivity", "pro") => [:TFP, :ZI, :μ, :μw],
+#     ),
+#     vars_to_plot,
+#     IRFs,
+#     IRFs_order,
+#     sr_full.indexes;
+#     horizon,
+#     show_fig = false,
+#     save_fig = true,
+#     path = paths["bld_example"] * "/IRFs_cat",
+#     yscale = "standard",
+#     style_options = (lw = 2, color = [:blue, :red, :green, :orange], linestyle = [:solid, :dash, :dot]),
+# );
 
-# Variance decomposition
-mkpath(paths["bld_example"] * "/VDs");
-plot_vardecomp(
-    vars_to_plot,
-    [(VDs, "10Y HANK")],
-    IRFs_order,
-    sr_full.indexes;
-    show_fig = false,
-    save_fig = true,
-    path = paths["bld_example"] * "/VDs",
-);
 
-mkpath(paths["bld_example"] * "/VDs_cat");
-plot_vardecomp(
-    vars_to_plot,
-    [(VDs, "10Y HANK")],
-    IRFs_order,
-    sr_full.indexes;
-    shock_categories = Dict(
-        ("Monetary", "mon") => [:Rshock, :A],
-        ("Fiscal", "fis") => [:Gshock, :GI], #:Tprogshock,
-        ("Productivity", "pro") => [:TFP, :ZI, :μ, :μw],
-    ),
-    show_fig = false,
-    save_fig = true,
-    path = paths["bld_example"] * "/VDs_cat",
-);
+# # Variance decomposition
+# mkpath(paths["bld_example"] * "/VDs");
+# plot_vardecomp(
+#     vars_to_plot,
+#     [(VDs, "10Y HANK")],
+#     IRFs_order,
+#     sr_full.indexes;
+#     show_fig = false,
+#     save_fig = true,
+#     path = paths["bld_example"] * "/VDs",
+# );
 
-# Business cycle frequency variance decomposition
-mkpath(paths["bld_example"] * "/VDbcs");
-plot_vardecomp_bcfreq(
-    vars_to_plot,
-    [(VDbcs, "10Y HANK")],
-    IRFs_order,
-    sr_full.indexes;
-    show_fig = false,
-    save_fig = true,
-    path = paths["bld_example"] * "/VDbcs",
-);
+# mkpath(paths["bld_example"] * "/VDs_cat");
+# plot_vardecomp(
+#     vars_to_plot,
+#     [(VDs, "10Y HANK")],
+#     IRFs_order,
+#     sr_full.indexes;
+#     shock_categories = Dict(
+#         ("Monetary", "mon") => [:Rshock, :A],
+#         ("Fiscal", "fis") => [:Gshock, :GI], #:Tprogshock,
+#         ("Productivity", "pro") => [:TFP, :ZI, :μ, :μw],
+#     ),
+#     show_fig = false,
+#     save_fig = true,
+#     path = paths["bld_example"] * "/VDs_cat",
+# );
 
-mkpath(paths["bld_example"] * "/VDbcs_cat");
-plot_vardecomp_bcfreq(
-    vars_to_plot,
-    [(VDbcs, "10Y HANK")],
-    IRFs_order,
-    sr_full.indexes;
-    shock_categories = Dict(
-        ("Monetary", "mon") => [:Rshock, :A],
-        ("Fiscal", "fis") => [:Gshock, :GI], #:Tprogshock,
-        ("Productivity", "pro") => [:TFP, :ZI, :μ, :μw],
-    ),
-    show_fig = false,
-    save_fig = true,
-    path = paths["bld_example"] * "/VDbcs_cat",
-);
+# # Business cycle frequency variance decomposition
+# mkpath(paths["bld_example"] * "/VDbcs");
+# plot_vardecomp_bcfreq(
+#     vars_to_plot,
+#     [(VDbcs, "10Y HANK")],
+#     IRFs_order,
+#     sr_full.indexes;
+#     show_fig = false,
+#     save_fig = true,
+#     path = paths["bld_example"] * "/VDbcs",
+# );
+
+# mkpath(paths["bld_example"] * "/VDbcs_cat");
+# plot_vardecomp_bcfreq(
+#     vars_to_plot,
+#     [(VDbcs, "10Y HANK")],
+#     IRFs_order,
+#     sr_full.indexes;
+#     shock_categories = Dict(
+#         ("Monetary", "mon") => [:Rshock, :A],
+#         ("Fiscal", "fis") => [:Gshock, :GI], #:Tprogshock,
+#         ("Productivity", "pro") => [:TFP, :ZI, :μ, :μw],
+#     ),
+#     show_fig = false,
+#     save_fig = true,
+#     path = paths["bld_example"] * "/VDbcs_cat",
+# );
 
 # Distributional IRFs
 irfs_to_plot = [
@@ -327,8 +336,12 @@ plot_distributional_irfs_deviation(
 
 # Print cumulative mutipliers
 println("\n--- Cumulative PV Multipliers: Public Investment (GI) ---")
-table_GI = compute_pv_multipliers(IRFs_mode, IRFs_order, sr_mode.indexes_r, sr_mode.XSS, :GI; max_horizon = 80)
+table_GI = compute_pv_multipliers(IRFs, IRFs_order, sr_full.indexes_r, sr_full.XSS, :GI; max_horizon = 100)
 display(table_GI)
+
+jldsave(paths["bld_example"] * "/Multipliers_debt.jld2", true; 
+    table_GI
+)
 
 @printf "\n"
 @printf "Done.\n"

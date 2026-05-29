@@ -45,7 +45,7 @@ ISS = m_par.δ_0 * KSS
 Π_FSS = (1.0 - mcSS) .* YSS
 
 # government investment shock
-GI_news_shockSS = 1.0
+GI_NSSS = 1.0
 
 # government investment
 GISS = m_par.GI_share * YSS
@@ -91,6 +91,7 @@ GI_news_36SS = GISS
 GI_news_37SS = GISS
 GI_news_38SS = GISS
 GI_news_39SS = GISS
+GI_news_40SS = GISS
 
 GI_lag1SS = GISS
 GI_lag2SS = GISS

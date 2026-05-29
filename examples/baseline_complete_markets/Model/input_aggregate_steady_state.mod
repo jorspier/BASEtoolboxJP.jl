@@ -44,58 +44,23 @@ YSS = output(ZSS, KSS, NSS, m_par)
 ISS = m_par.δ_0 * KSS
 Π_FSS = (1.0 - mcSS) .* YSS
 
-# government investment shock
-GI_news_shockSS = 1.0
-
 # Government invetsment
 GISS = m_par.GI_share * YSS
 KGSS = GISS / m_par.δ_KG
 
-# All news variables in steady state equal realized GI
-GI_news_1SS = GISS
-GI_news_2SS = GISS
-GI_news_3SS = GISS
-GI_news_4SS = GISS
-GI_news_5SS = GISS
-GI_news_6SS = GISS
-GI_news_7SS = GISS
-GI_news_8SS = GISS
-GI_news_9SS = GISS
-GI_news_10SS = GISS
-GI_news_11SS = GISS
-GI_news_12SS = GISS
-GI_news_13SS = GISS
-GI_news_14SS = GISS
-GI_news_15SS = GISS
-GI_news_16SS = GISS
-GI_news_17SS = GISS
-GI_news_18SS = GISS
-GI_news_19SS = GISS
-GI_news_20SS = GISS
-GI_news_21SS = GISS
-GI_news_22SS = GISS
-GI_news_23SS = GISS
-GI_news_24SS = GISS
-GI_news_25SS = GISS
-GI_news_26SS = GISS
-GI_news_27SS = GISS
-GI_news_28SS = GISS
-GI_news_29SS = GISS
-GI_news_30SS = GISS
-GI_news_31SS = GISS
-GI_news_32SS = GISS
-GI_news_33SS = GISS
-GI_news_34SS = GISS
-GI_news_35SS = GISS
-GI_news_36SS = GISS
-GI_news_37SS = GISS
-GI_news_38SS = GISS
-GI_news_39SS = GISS
-
+# Construction lags
 GI_lag1SS = GISS
 GI_lag2SS = GISS
 GI_lag3SS = GISS
 GI_lag4SS = GISS
+GI_lag5SS = GISS
+GI_lag6SS = GISS
+GI_lag7SS = GISS
+GI_lag8SS = GISS
+GI_lag9SS = GISS
+GI_lag10SS = GISS
+GI_lag11SS = GISS
+GI_lag12SS = GISS
 
 # financial market
 LPSS = RKSS / (RBSS / πSS)

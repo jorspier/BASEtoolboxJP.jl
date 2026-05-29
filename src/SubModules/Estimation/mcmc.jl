@@ -56,7 +56,7 @@ function rwmh(
             accprob = min(exp(new_posterior - old_posterior), 1.0)
             if alarm == false && rand() .<= accprob
                 draws[i, :] = xhatstar
-                posterior[i] = copy(old_posterior)
+                posterior[i] = new_posterior   # was copy(old_posterior) — off-by-one bug
                 old_posterior = new_posterior
                 accept += 1
             else

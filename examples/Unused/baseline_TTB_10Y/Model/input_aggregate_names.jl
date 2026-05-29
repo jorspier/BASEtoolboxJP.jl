@@ -7,7 +7,7 @@
 n_rep = 1 # Number of n_rep of some model equations (e.g. countries, industries)
 
 # List of aggregate shocks, without duplication (e.g. across countries or industries)
-shock_names = [:TFP, :ZI, :μ, :μw, :A, :Rshock, :Gshock, :GI_news_shock, :Tprogshock, :Sshock] 
+shock_names = [:TFP, :ZI, :μ, :μw, :A, :Rshock, :Gshock, :GI_NS, :Tprogshock, :Sshock]
 
 # List of aggregate states, without duplication of names (e.g. across countries or industries)
 # Duplicated names are created below
@@ -35,7 +35,7 @@ state_names = [
     "Sshock",
     "TFP",
     "KG",
-    "GI_news_shock",
+    "GI_NS",
     "GI_lag1",
     "GI_lag2",
     "GI_lag3",
@@ -79,6 +79,7 @@ state_names = [
     "GI_news_37",
     "GI_news_38",
     "GI_news_39",
+    "GI_news_40",
 ]
 
 # List of (the subset) of aggregate states, that need to be duplicated (e.g. across countries or industries)
@@ -89,7 +90,7 @@ dup_state_names = Vector{String}(undef, 0)
 
 # List cross-sectional controls / distributional summary variables (no equations in aggregate model expected)
 # if these need to be duplicated, do by hand !
-distr_names = ["GiniC", "GiniW", "TOP10Ishare", "TOP10Inetshare", "TOP10Wshare", "sdlogy"]
+distr_names = ["GiniC", "GiniI", "GiniInet", "GiniW", "TOP10Ishare", "TOP10Inetshare", "TOP10Wshare", "sdlogy"]
 
 control_names = [
     "RK_before_taxes",

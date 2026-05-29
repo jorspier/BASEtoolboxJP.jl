@@ -38,75 +38,6 @@ BASEforHANK.LinearAlgebra.BLAS.set_num_threads(Threads.nthreads());
 
 m_par = ModelParameters();
 
-# @set! m_par.ξ = 4.0;
-# @set! m_par.γ = 2.0;
-# @set! m_par.β = 0.991673574071822;
-# @set! m_par.λ = 0.02234890580840817; 
-# @set! m_par.ρ_h = 0.9815;
-# @set! m_par.σ_h = 0.135;
-# @set! m_par.ι = 0.0625;
-# @set! m_par.ζ = 0.0005; 
-# @set! m_par.α = 0.32;
-# @set! m_par.δ_0 = 0.015;
-# @set! m_par.δ_s = 0.7180368636852436;
-# @set! m_par.ϕ = 1.966794427917757;
-# @set! m_par.μ = 1.05;
-# @set! m_par.κ = 0.1479251925067033;
-# @set! m_par.μw = 1.05;
-# @set! m_par.κw = 0.24550729545132235;
-# @set! m_par.Tlev = 1.0 + 0.1225298495374623756;
-# @set! m_par.Tprog = 1.0 + 0.2;
-# @set! m_par.Tc = 1.0;
-# @set! m_par.Tk = 1.0;
-# @set! m_par.Ttr_1 = 1.55;
-# @set! m_par.Ttr_2 = 1.8;
-# @set! m_par.RRB = 1.0;
-# @set! m_par.Rbar = 0.036798968157815665;
-# @set! m_par.ωΠ = 0.2;
-# @set! m_par.ιΠ = 0.016;
-# @set! m_par.shiftΠ = 0.7138438278245689;
-# @set! m_par.ρ_A = 0.9998728292904844;
-# @set! m_par.σ_A = 0.0023446421723594727;
-# @set! m_par.ρ_ZI = 0.7618447236808487;
-# @set! m_par.σ_ZI = 0.07436546031946978;
-# @set! m_par.ρ_μ = 0.9733829673391314;
-# @set! m_par.σ_μ = 0.014809661702069623;
-# @set! m_par.ρ_μw = 0.9110208706720851;
-# @set! m_par.σ_μw = 0.036870468298782905;
-# @set! m_par.ρ_s = 0.5559631986300858;
-# @set! m_par.σ_Sshock = 0.6918558038597916; # 0.0
-# @set! m_par.Σ_n = 28.879770107327673; # 0.0
-# @set! m_par.ρ_R = 0.8238297433452639;
-# @set! m_par.σ_Rshock = 0.0031182372723710205;
-# @set! m_par.θ_π = 1.25;
-# @set! m_par.θ_Y = 0.0;
-# @set! m_par.γ_B = 0.1;
-# @set! m_par.γ_π = -2.1989682009232125;
-# @set! m_par.γ_Y = -0.4417816197316064;
-# @set! m_par.ρ_Gshock = 0.9986388882841384;
-# @set! m_par.σ_Gshock = 0.01; # 0.004712013201311698;
-# @set! m_par.ρ_τ = 0.5052588859076916;
-# @set! m_par.γ_Bτ = 0.0;
-# @set! m_par.γ_Yτ = -0.9430455116131855;
-# @set! m_par.ρ_P = 0.9410326697915214;
-# @set! m_par.σ_Tprogshock = 0.0;
-# @set! m_par.γ_BP = 0.0;
-# @set! m_par.γ_YP = 0.0;
-# @set! m_par.γ_WP = 0.0;
-# @set! m_par.ρ_Rshock = 1.0e-8;
-# @set! m_par.ρ_Tprogshock = 1.0e-8;
-# @set! m_par.ρ_Sshock = 1.0e-8;
-# @set! m_par.ρ_TFP = 0.5045353093162687;     
-# @set! m_par.σ_TFP = 0.025251212935269763; 
-
-# # new govt investment parameters
-# @set! m_par.γ_GI = 1.0;                    # Deficit reaction to GI (0 = tax financed, 1 = debt)
-# @set! m_par.GI_share = 0.028;              # Steady state share of govt investment
-# @set! m_par.δ_KG = 0.01;                   # Depreciation of public capital
-# @set! m_par.η_KG = 0.1;                    # Elasticity of output w.r.t public capital
-# @set! m_par.ρ_GI = 0.5209852270953002;     # Spending is announced once; persistence originates from TTB
-# @set! m_par.σ_GI = 0.01; # 0.005158611558252573 
-
 
 ## ------------------------------------------------------------------------------------------
 ## Calculate Steady State and prepare linearization
@@ -123,22 +54,38 @@ K = exp.(sr_full.XSS[sr_full.indexes.KSS]);
 B = exp.(sr_full.XSS[sr_full.indexes.BSS]);
 Bgov = exp.(sr_full.XSS[sr_full.indexes.BgovSS]);
 Y = exp.(sr_full.XSS[sr_full.indexes.YSS]);
-T10W = exp(sr_full.XSS[sr_full.indexes.TOP10WshareSS]);
 G = exp.(sr_full.XSS[sr_full.indexes.GSS]);
+T10W = exp(sr_full.XSS[sr_full.indexes.TOP10WshareSS]);
+T10I = exp(sr_full.XSS[sr_full.indexes.TOP10IshareSS]);
+T10Inet = exp(sr_full.XSS[sr_full.indexes.TOP10InetshareSS]);
+B50W = exp(sr_full.XSS[sr_full.indexes.BOT50WshareSS]);
+B50I = exp(sr_full.XSS[sr_full.indexes.BOT50IshareSS]);
+B50Inet = exp(sr_full.XSS[sr_full.indexes.BOT50InetshareSS]);
+GiniC = exp(sr_full.XSS[sr_full.indexes.GiniCSS]);
+GiniI = exp(sr_full.XSS[sr_full.indexes.GiniISS]);
+GiniInet = exp(sr_full.XSS[sr_full.indexes.GiniInetSS]);
+GiniW = exp(sr_full.XSS[sr_full.indexes.GiniWSS]);
 fr_borr = BASEforHANK.eval_cdf(sr_full.distrSS, :b, sr_full.n_par, 0.0);
-KG = exp.(sr_full.XSS[sr_full.indexes.KGSS]);
 
 # Display steady state moments
 @printf "\n"
 pretty_table(
     [
         "TOP 10 Wealth Share" T10W
+        "BOT 50 Wealth Share" B50W
+        "TOP 10 Income Share" T10I
+        "BOT 50 Income Share" B50I
+        "TOP 10 Income Share (Net)" T10Inet
+        "BOT 50 Income Share (Net)" B50Inet
+        "Gini of Consumption" GiniC
+        "Gini of Income" GiniI
+        "Gini of Net Income" GiniInet
+        "Gini of Wealth" GiniW
         "Fraction of Borrower" fr_borr
         "Liquid to Illiquid Assets Ratio" B/K
         "Private Capital to Output Ratio" K / Y/4.0
         "Government Debt to Output Ratio" Bgov / Y/4.0
         "Government Spending to Output Ratio" G/Y
-        "Public Capital to Output Ratio" KG/Y/4.0
     ];
     header = ["Variable", "Value"],
     title = "Steady State Moments",
@@ -183,74 +130,82 @@ IRFs, _, IRFs_order = compute_irfs( # , IRFs_dist
 );
 
 # Export IRFs
-idx_dict_hank_AR1 = Dict{Symbol, Int}(
+idx_dict_HANK_TTB4 = Dict{Symbol, Int}(
     name => getfield(sr_full.indexes, name) 
     for name in fieldnames(typeof(sr_full.indexes)) 
     if getfield(sr_full.indexes, name) isa Int
+        && !endswith(string(name), "SS")
 )
-jldsave(paths["bld_example"] * "/IRFs_HANK_AR1.jld2", true; 
+jldsave(paths["bld_example"] * "/IRFs_HANK_TTB4.jld2", true; 
     IRFs, 
     IRFs_order, 
-    IRFs_dist,
-    idx_dict_hank_AR1
+   # IRFs_dist,
+    idx_dict_HANK_TTB4
 )
 # Compute variance decomposition of IRFs
-VDs = compute_vardecomp(IRFs);
+# VDs = compute_vardecomp(IRFs);
 
-# Compute business cycle frequency variance decomposition
-VDbcs, UnconditionalVar =
-    compute_vardecomp_bcfreq(exovars, stds, lr_full.State2Control, lr_full.LOMstate);
+# # Compute business cycle frequency variance decomposition
+# VDbcs, UnconditionalVar =
+#     compute_vardecomp_bcfreq(exovars, stds, lr_full.State2Control, lr_full.LOMstate);
 
 ## ------------------------------------------------------------------------------------------
 ## Graphical outputs
 ## ------------------------------------------------------------------------------------------
-
+#=
 @printf "\n"
 @printf "Plotting...\n"
+
+# σ_GI = 0.0882 and σ_Gshock = 0.01555 were set to 10% of their true values
+# (0.882 and 0.1555) to keep the linearization valid. Since IRFs scale linearly,
+# multiply those shock columns by 10 so plots reflect true shock magnitudes.
+# The saved JLD2 and VDs use the original (unscaled) IRFs.
+irf_plot_scales = Dict(:GI => 10.0, :Gshock => 10.0)
+IRFs_plot = copy(IRFs)
+for (shock, scale) in irf_plot_scales
+    idx = findfirst(==(shock), IRFs_order)
+    !isnothing(idx) && (IRFs_plot[:, :, idx] .*= scale)
+end
 
 # Define here once all variables and shocks to plot for all figures 
 horizon = 80; 
 
 shocks_to_plot = [
-    #(:Z, "Effective TFP"),
     (:GI, "Gov. Investment"), 
-    #(:TFP, "TFP Shock"),
-    #(:ZI, "Inv.-spec. tech."),
-    #(:μ, "Price markup"),
-    #(:μw, "Wage markup"),
-    #(:A, "Risk premium"),
-    #(:Rshock, "Mon. policy"),
-    (:Gshock, "Structural deficit"),
-    #(:Tprogshock, "Tax progr."),
-    #(:Sshock, "Income risk"),
+    (:Gshock, "Gov. Consumption"),
 ]
 
-vars_to_plot = [
+vars_agg = [
     (:Y, "Output"), # removed growth
     (:C, "Consumption"),
     (:Bgov, "Gov. Debt"),
-    (:KG, "Public Capital"),    
+    (:KG, "Public Capital"), 
+    (:G, "Gov. Spending"),   
     (:K, "Private Capital"),
     (:I, "Investment"),
     (:N, "Employment"),
     (:wF, "Wage"),
     (:π, "Inflation"),
     (:RB, "Nominal rate"),
-    #(:σ, "Income risk"),
-    #(:Tprog, "Tax progressivity"),
-    #(:TOP10Wshare, "Top 10 wealth share"),
-    #(:TOP10Ishare, "Top 10 gross inc. share"),
-    #(:TOP10Inetshare, "Top 10 net inc. share"),
-    (:GiniW, "Wealth Gini"),
-    (:GiniC, "Consumption Gini") 
 ];
+
+vars_dist = [
+        (:GiniC, "Gini of Consumption"),
+        (:GiniW, "Gini of Wealth"),
+        (:GiniI, "Gini of Income"),
+        (:GiniInet, "Gini of Net Income"),
+        (:TOP10Wshare, "Top 10% Wealth Share"),
+        (:TOP10Ishare, "Top 10% Income Share"),
+        (:BOT50Wshare, "Bot 50% Wealth Share"),
+        (:BOT50Ishare, "Bot 50% Income Share"),
+]
 
 # IRFs
 mkpath(paths["bld_example"] * "/IRFs");
 plot_irfs(
     shocks_to_plot,
-    vars_to_plot,
-    [(IRFs, "Baseline")],
+    vars_agg,
+    [(IRFs_plot, "HANK")],
     IRFs_order,
     sr_full.indexes;
     horizon,
@@ -262,15 +217,30 @@ plot_irfs(
     style_options = (lw = 2, color = [:blue, :red], linestyle = [:solid, :dash]),
 );
 
+plot_irfs(
+    shocks_to_plot,
+    vars_dist,
+    [(IRFs_plot, "HANK")],
+    IRFs_order,
+    sr_full.indexes;
+    horizon,
+    save_fig_indiv = false,
+    show_fig = false,
+    save_fig = true,
+    path = paths["bld_example"] * "/IRFs_dist",
+    yscale = "standard",
+    style_options = (lw = 2, color = [:blue, :red], linestyle = [:solid, :dash]),
+);
+
+
+
 mkpath(paths["bld_example"] * "/IRFs_cat");
 plot_irfs_cat(
     Dict(
-        #("Monetary", "mon") => [:Rshock, :A],
         ("Fiscal", "fis") => [:Gshock, :GI], # :Tprogshock
-        #("Productivity", "pro") => [:TFP, :ZI, :μ, :μw],
     ),
-    vars_to_plot,
-    IRFs,
+    vars_agg,
+    IRFs_plot,
     IRFs_order,
     sr_full.indexes;
     horizon,
@@ -281,79 +251,21 @@ plot_irfs_cat(
     style_options = (lw = 2, color = [:blue, :red, :green, :orange], linestyle = [:solid, :dash, :dot]),
 );
 
-## -----------
-## Comparison
-## -----------
-# Load the smoothed data
-path_smoothed = joinpath(paths["bld"], "baseline_TTB_smooth_noestim", "IRFs_smoothed.jld2")
-IRFs_smooth       = load(path_smoothed, "IRFs")
-idx_dict_smooth   = load(path_smoothed, "idx_dict_smooth")
-IRFs_order_smooth = load(path_smoothed, "IRFs_order")
-
-# Active AR(1) data
-IRFs_front = IRFs
-ids_front  = sr_full.indexes
-
-# Scale Gini coefficients
-IRFs_front[ids_front.GiniW, :, :] ./= 100.0
-IRFs_front[ids_front.GiniC, :, :] ./= 100.0
-IRFs_smooth[idx_dict_smooth[:GiniW], :, :] ./= 100.0
-IRFs_smooth[idx_dict_smooth[:GiniC], :, :] ./= 100.0
-
-IRFs_front[ids_front.π, :, :] ./= 100.0
-IRFs_front[ids_front.RB, :, :] ./= 100.0
-IRFs_smooth[idx_dict_smooth[:π], :, :] ./= 100.0
-IRFs_smooth[idx_dict_smooth[:RB], :, :] ./= 100.0
-
-# ---------------------------------------------------------
-# Map MA(39) to AR(1) dimensions (Variables AND Shocks)
-# ---------------------------------------------------------
-IRFs_smooth_aligned = zeros(size(IRFs_front))
-
-# Rename Auth to GI in the loaded shock order array
-IRFs_order_smooth[IRFs_order_smooth .== :Auth] .= :GI
-
-# Map variables (1st dimension) and shocks (3rd dimension)
-for (var, idx_smooth_var) in idx_dict_smooth
-    if hasproperty(ids_front, var)
-        idx_front_var = getfield(ids_front, var)
-        
-        # Check if they are integers AND within the matrix row bounds
-        if idx_front_var isa Int && idx_smooth_var isa Int
-            if 0 < idx_front_var <= size(IRFs_front, 1) && 0 < idx_smooth_var <= size(IRFs_smooth, 1)
-                for (front_shock_idx, shock_name) in enumerate(IRFs_order)
-                    # Find where this shock is located in the MA(39) matrix
-                    smooth_shock_idx = findfirst(==(shock_name), IRFs_order_smooth)
-                    
-                    if !isnothing(smooth_shock_idx)
-                        IRFs_smooth_aligned[idx_front_var, :, front_shock_idx] = IRFs_smooth[idx_smooth_var, :, smooth_shock_idx]
-                    end
-                end
-            end
-        end
-    end
-end
-
-# Define the plot comparison
-IRFs_to_plot = [
-    (IRFs_front, "Front-loaded AR(1)"),
-    (IRFs_smooth_aligned, "10-Year Plan")
-]
-
-# Plot combined IRFs using the active AR(1) IDs and shock order
-mkpath(paths["bld_example"] * "/IRFs_comparison");
-plot_irfs(
-    shocks_to_plot,
-    vars_to_plot,
-    IRFs_to_plot,
+plot_irfs_cat(
+    Dict(
+        ("Fiscal", "fis") => [:Gshock, :GI], 
+    ),
+    vars_dist,
+    IRFs_plot,
     IRFs_order,
-    ids_front;
-    horizon = 80,
+    sr_full.indexes;
+    horizon,
+    show_fig = false,
     save_fig = true,
-    path = joinpath(paths["bld_example"], "/IRFs_comparison"),
-    style_options = (lw = 2, color = [:blue, :red], linestyle = [:solid, :dash])
-)
-
+    path = paths["bld_example"] * "/IRFs_dist",
+    yscale = "standard",
+    style_options = (lw = 2, color = [:blue, :red, :green, :orange], linestyle = [:solid, :dash, :dot]),
+);
 
 #=
 # Variance decomposition
@@ -411,6 +323,7 @@ plot_vardecomp_bcfreq(
     save_fig = true,
     path = paths["bld_example"] * "/VDbcs_cat",
 );
+=#
 
 # Distributional IRFs
 irfs_to_plot = [
@@ -456,8 +369,8 @@ plot_distributional_irfs_deviation(
     save_fig = true, 
     path = paths["bld_example"] * "/IRFs_dist_dev"
 )
-=#
 
+=#
 @printf "\n"
 @printf "Done.\n"
 println("Total Runtime: ", round((time() - global_start_time) / 60; digits=2), " minutes")

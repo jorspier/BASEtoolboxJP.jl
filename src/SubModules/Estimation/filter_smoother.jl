@@ -264,6 +264,13 @@ function kalman_filter_smoother(
     OmegaInv = zeros(Float64, n_obs_vars, n_obs_vars, T)
     log_lik = 0.0
 
+    # Pre-allocate smoother output arrays so the early-exit path (sign_logdet < 0)
+    # can return a type-consistent 7-tuple (zeros) rather than a bare Float64 scalar.
+    xhat_tgT = zeros(Float64, n_states, T)
+    Sigma_tgT = zeros(Float64, n_states, n_states, T)
+    s = zeros(Float64, n_states, T)
+    m = zeros(Float64, n_obs_vars, T)
+
     for t = 1:T
         # compute likelihood contribution
         resi[D_nomiss[t, :], t] =
@@ -276,7 +283,8 @@ function kalman_filter_smoother(
             if e_set.debug_print
                 @printf "KF\n"
             end
-            return log_lik
+            # Return consistent 7-tuple (smoother arrays are zero: forward pass diverged)
+            return log_lik, xhat_tgt, xhat_tgT, Sigma_tgt, Sigma_tgT, s, m
         else
             OmegaInv[D_nomiss[t, :], D_nomiss[t, :], t] = I / Ω
             log_lik +=
@@ -306,14 +314,12 @@ function kalman_filter_smoother(
         Sigma_tgtm1[:, :, t + 1] = 0.5 * (Sigma_tgtm1_temp + transpose(Sigma_tgtm1_temp))
     end
 
-    xhat_tgT = zeros(Float64, n_states, T)
+    # xhat_tgT, Sigma_tgT, s, m are already pre-allocated as zeros above the forward loop.
+    # Set backward-smoother initial conditions at t = T:
     xhat_tgT[:, T] = xhat_tgt[:, T]
-    Sigma_tgT = zeros(Float64, n_states, n_states, T)
     Sigma_tgT[:, :, T] = Sigma_tgt[:, :, T]
     r = zeros(Float64, n_states, T + 1)
     N = zeros(Float64, n_states, n_states, T + 1)
-    s = zeros(Float64, n_states, T)
-    m = zeros(Float64, n_obs_vars, T)
     for t = T:-1:1
         r[:, t] =
             H[D_nomiss[t, :], :]' *
