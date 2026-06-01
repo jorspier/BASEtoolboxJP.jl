@@ -59,7 +59,7 @@ dup_state_names = Vector{String}(undef, 0)
 
 # List cross-sectional controls / distributional summary variables (no equations in aggregate model expected)
 # if these need to be duplicated, do by hand !
-distr_names = ["BOT50Ishare", "BOT50Inetshare", "BOT50Wshare", "GiniC", "GiniI", "GiniInet", "GiniW", "TOP10Ishare", "TOP10Inetshare", "TOP10Wshare", "sdlogy"]
+distr_names = ["BOT50Ishare", "BOT50Inetshare", "BOT50Wshare", "FrBorr", "GiniC", "GiniI", "GiniInet", "GiniW", "TOP10Ishare", "TOP10Inetshare", "TOP10Wshare", "sdlogy"]
 
 control_names = [
     "RK_before_taxes",

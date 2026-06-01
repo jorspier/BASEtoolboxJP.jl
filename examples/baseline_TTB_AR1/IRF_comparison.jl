@@ -28,7 +28,7 @@ Comparisons produced:
 root_dir = replace(Base.current_project(), "Project.toml" => "")
 cd(root_dir)
 
-using JLD2, Printf
+using JLD2, Printf, CSV, DataFrames
 
 bld_ar1  = joinpath(root_dir, "bld", "baseline_TTB_AR1_noestim")
 bld_cm   = joinpath(root_dir, "bld", "baseline_complete_markets_noestim")
@@ -146,24 +146,36 @@ end
 
 @printf "Loading IRF files...\n"
 
-IRFs_HANK_noTTB, order_hank, idx_HANK_noTTB = load_irfs(joinpath(bld_ar1, "IRFs_HANK_noTTB.jld2"));
-IRFs_HANK_TTB4, _, idx_HANK_TTB4  = load_irfs(joinpath(bld_ar1, "IRFs_HANK_TTB4.jld2"));
-IRFs_HANK_TTB12, _, idx_HANK_TTB12 = load_irfs(joinpath(bld_ar1, "IRFs_HANK_TTB12.jld2"));
-IRFs_HANK_noTTB_eta5, _, idx_HANK_noTTB_eta5 = load_irfs(joinpath(bld_ar1, "IRFs_HANK_noTTB_eta5.jld2"));
-IRFs_HANK_noTTB_eta20, _, idx_HANK_noTTB_eta20 = load_irfs(joinpath(bld_ar1, "IRFs_HANK_noTTB_eta20.jld2"));
+# Steady-state scalars — each model family saves one shared file
+ss_hank = load(joinpath(bld_ar1, "ss_dict.jld2"))["ss_dict"]::Dict{Symbol,Float64};
+ss_cm   = load(joinpath(bld_cm,  "ss_dict.jld2"))["ss_dict"]::Dict{Symbol,Float64};
 
-#IRFs_tax, _, idx_tax   = load_irfs(joinpath(bld_ar1, "IRFs_HANK_tax.jld2"));
+IRFs_HANK_noTTB,      order_hank, idx_HANK_noTTB      = load_irfs(joinpath(bld_ar1, "IRFs_HANK_noTTB.jld2"));
 
-IRFs_CM_noTTB,    order_cm,  idx_CM_noTTB    = load_irfs(joinpath(bld_cm,  "IRFs_CM_noTTB.jld2"));
-IRFs_CM_TTB4,     _,         idx_CM_TTB4   = load_irfs(joinpath(bld_cm,  "IRFs_CM_TTB4.jld2"));
-IRFs_CM_TTB12,    _,         idx_CM_TTB12  = load_irfs(joinpath(bld_cm,  "IRFs_CM_TTB12.jld2"));
-IRFs_CM_noTTB_eta5, _, idx_CM_noTTB_eta5 = load_irfs(joinpath(bld_cm,  "IRFs_CM_noTTB_eta5.jld2"));
-IRFs_CM_noTTB_eta20, _, idx_CM_noTTB_eta20 = load_irfs(joinpath(bld_cm,  "IRFs_CM_noTTB_eta20.jld2"));
-IRFs_CM_noTTB_HANKpars, _, idx_CM_noTTB_HANKpars = load_irfs(joinpath(bld_cm,  "IRFs_CM_noTTB_HANKpars.jld2"));
+IRFs_HANK_TTB4,       _,          idx_HANK_TTB4        = load_irfs(joinpath(bld_ar1, "IRFs_HANK_TTB4.jld2"));
+IRFs_HANK_TTB12,      _,          idx_HANK_TTB12       = load_irfs(joinpath(bld_ar1, "IRFs_HANK_TTB12.jld2"));
+
+IRFs_HANK_noTTB_eta5, _,          idx_HANK_noTTB_eta5  = load_irfs(joinpath(bld_ar1, "IRFs_HANK_noTTB_eta5.jld2"));
+IRFs_HANK_noTTB_eta20,_,          idx_HANK_noTTB_eta20 = load_irfs(joinpath(bld_ar1, "IRFs_HANK_noTTB_eta20.jld2"));
+
+IRFs_HANK_noTTB_noStab, _, idx_HANK_noTTB_noStab = load_irfs(joinpath(bld_ar1, "IRFs_HANK_noTTB_noStab.jld2"));
+IRFs_HANK_noTTB_noPiStab, _, idx_HANK_noTTB_noPiStab = load_irfs(joinpath(bld_ar1, "IRFs_HANK_noTTB_noPiStab.jld2"));
+
+IRFs_HANK_noTTB_tr03, _, idx_HANK_noTTB_tr03 = load_irfs(joinpath(bld_ar1, "IRFs_HANK_noTTB_tr03.jld2"));
+IRFs_HANK_noTTB_tr2,  _, idx_HANK_noTTB_tr2  = load_irfs(joinpath(bld_ar1, "IRFs_HANK_noTTB_tr2.jld2"));
+
+IRFs_HANK_noTTB_tax, _, idx_HANK_noTTB_tax = load_irfs(joinpath(bld_ar1, "IRFs_HANK_noTTB_tax.jld2"));
+IRFs_HANK_noTTB_tax_Yneg, _, idx_HANK_noTTB_tax_Yneg = load_irfs(joinpath(bld_ar1, "IRFs_HANK_noTTB_tax_Yneg.jld2"));
+
+IRFs_CM_noTTB,         order_cm, idx_CM_noTTB         = load_irfs(joinpath(bld_cm, "IRFs_CM_noTTB.jld2"));
+IRFs_CM_TTB4,          _,        idx_CM_TTB4          = load_irfs(joinpath(bld_cm, "IRFs_CM_TTB4.jld2"));
+IRFs_CM_TTB12,         _,        idx_CM_TTB12         = load_irfs(joinpath(bld_cm, "IRFs_CM_TTB12.jld2"));
+IRFs_CM_noTTB_eta5,    _,        idx_CM_noTTB_eta5    = load_irfs(joinpath(bld_cm, "IRFs_CM_noTTB_eta5.jld2"));
+IRFs_CM_noTTB_eta20,   _,        idx_CM_noTTB_eta20   = load_irfs(joinpath(bld_cm, "IRFs_CM_noTTB_eta20.jld2"));
+IRFs_CM_noTTB_HANKpars,_,        idx_CM_noTTB_HANKpars= load_irfs(joinpath(bld_cm, "IRFs_CM_noTTB_HANKpars.jld2"));
 
 # Build a NamedTuple index handle for the AR1 model (identical across all AR1 variants)
 ids_hank = dict_to_nt(filter(p -> !endswith(string(p.first), "SS"), idx_HANK_noTTB));
-
 
 # ==============================================================================
 # Shock scaling
@@ -181,10 +193,22 @@ IRFs_HANK_TTB12_plot = apply_scales(IRFs_HANK_TTB12, order_hank, scales);
 IRFs_HANK_noTTB_eta5_plot  = apply_scales(IRFs_HANK_noTTB_eta5,  order_hank, scales);
 IRFs_HANK_noTTB_eta20_plot  = apply_scales(IRFs_HANK_noTTB_eta20,  order_hank, scales);
 
-#IRFs_tax_plot   = apply_scales(IRFs_tax,   order_hank, scales);
+IRFs_HANK_noTTB_noStab_plot = apply_scales(IRFs_HANK_noTTB_noStab, order_hank, scales);
+IRFs_HANK_noTTB_noPiStab_plot = apply_scales(IRFs_HANK_noTTB_noPiStab, order_hank, scales);
 
+IRFs_HANK_noTTB_tr03_plot = apply_scales(IRFs_HANK_noTTB_tr03, order_hank, scales);
+IRFs_HANK_noTTB_tr2_plot  = apply_scales(IRFs_HANK_noTTB_tr2, order_hank, scales);
+
+IRFs_HANK_noTTB_tax_plot = apply_scales(IRFs_HANK_noTTB_tax, order_hank, scales);
+IRFs_HANK_noTTB_tax_Yneg_plot = apply_scales(IRFs_HANK_noTTB_tax_Yneg, order_hank, scales);
 
 # Align complete-markets IRFs to the AR1 row / shock-column structure, then scale
+IRFs_HANK_noTTB_tr03_aligned = align_irfs(IRFs_HANK_noTTB_tr03, idx_HANK_noTTB_tr03, order_hank, IRFs_HANK_noTTB, idx_HANK_noTTB, order_hank);
+IRFs_HANK_noTTB_tr03_aligned_plot = apply_scales(IRFs_HANK_noTTB_tr03_aligned, order_hank, scales);
+
+IRFs_HANK_noTTB_tr2_aligned = align_irfs(IRFs_HANK_noTTB_tr2, idx_HANK_noTTB_tr2, order_hank, IRFs_HANK_noTTB, idx_HANK_noTTB, order_hank);
+IRFs_HANK_noTTB_tr2_aligned_plot = apply_scales(IRFs_HANK_noTTB_tr2_aligned, order_hank, scales);
+
 IRFs_CM_noTTB_aligned      = align_irfs(IRFs_CM_noTTB, idx_CM_noTTB, order_cm, IRFs_HANK_noTTB, idx_HANK_noTTB, order_hank);
 IRFs_CM_noTTB_aligned_plot = apply_scales(IRFs_CM_noTTB_aligned, order_hank, scales);
 
@@ -194,15 +218,26 @@ IRFs_CM_noTTB_HANKpars_aligned_plot = apply_scales(IRFs_CM_noTTB_HANKpars_aligne
 # Pre-scale quarterly-rate rows ×4 so that factor=100 in plot_irfs gives
 # annualised pp for π, RB, LPXA, RR while quantity rows remain as % change.
 # This lets all variables appear in one combined figure with a single call.
-rate_vars = [:π, :RB, :LPXA]
+rate_vars = [:π, :RB, :LPXA];
 
-IRFs_HANK_noTTB_paper                = prescale_rows(IRFs_HANK_noTTB_plot,                   ids_hank, rate_vars)
-IRFs_HANK_TTB4_paper                 = prescale_rows(IRFs_HANK_TTB4_plot,                    ids_hank, rate_vars)
-IRFs_HANK_TTB12_paper                = prescale_rows(IRFs_HANK_TTB12_plot,                   ids_hank, rate_vars)
-IRFs_HANK_noTTB_eta5_paper           = prescale_rows(IRFs_HANK_noTTB_eta5_plot,              ids_hank, rate_vars)
-IRFs_HANK_noTTB_eta20_paper          = prescale_rows(IRFs_HANK_noTTB_eta20_plot,             ids_hank, rate_vars)
-IRFs_CM_noTTB_aligned_paper          = prescale_rows(IRFs_CM_noTTB_aligned_plot,             ids_hank, rate_vars)
-IRFs_CM_noTTB_HANKpars_aligned_paper = prescale_rows(IRFs_CM_noTTB_HANKpars_aligned_plot,   ids_hank, rate_vars)
+IRFs_HANK_noTTB_paper                = prescale_rows(IRFs_HANK_noTTB_plot,                   ids_hank, rate_vars);
+IRFs_HANK_TTB4_paper                 = prescale_rows(IRFs_HANK_TTB4_plot,                    ids_hank, rate_vars);
+IRFs_HANK_TTB12_paper                = prescale_rows(IRFs_HANK_TTB12_plot,                   ids_hank, rate_vars);
+
+IRFs_HANK_noTTB_eta5_paper           = prescale_rows(IRFs_HANK_noTTB_eta5_plot,              ids_hank, rate_vars);
+IRFs_HANK_noTTB_eta20_paper          = prescale_rows(IRFs_HANK_noTTB_eta20_plot,             ids_hank, rate_vars);
+
+IRFs_HANK_noTTB_noStab_paper         = prescale_rows(IRFs_HANK_noTTB_noStab_plot,           ids_hank, rate_vars);
+IRFs_HANK_noTTB_noPiStab_paper       = prescale_rows(IRFs_HANK_noTTB_noPiStab_plot,         ids_hank, rate_vars);
+
+IRFs_HANK_noTTB_tr03_paper           = prescale_rows(IRFs_HANK_noTTB_tr03_aligned_plot,     ids_hank, rate_vars);
+IRFs_HANK_noTTB_tr2_paper            = prescale_rows(IRFs_HANK_noTTB_tr2_aligned_plot,      ids_hank, rate_vars);
+
+IRFs_HANK_noTTB_tax_paper           = prescale_rows(IRFs_HANK_noTTB_tax_plot,              ids_hank, rate_vars);
+IRFs_HANK_noTTB_tax_Yneg_paper     = prescale_rows(IRFs_HANK_noTTB_tax_Yneg_plot,        ids_hank, rate_vars);
+
+IRFs_CM_noTTB_aligned_paper          = prescale_rows(IRFs_CM_noTTB_aligned_plot,             ids_hank, rate_vars);
+IRFs_CM_noTTB_HANKpars_aligned_paper = prescale_rows(IRFs_CM_noTTB_HANKpars_aligned_plot,   ids_hank, rate_vars);
 
 # ==============================================================================
 # Common plot specification
@@ -230,21 +265,52 @@ vars_agg = [
     (:π,    "Inflation"),
     (:RB,   "Nominal Rate"),
     (:T,    "Tax Revenue"),
-    (:TR,   "Transfers"),
-    #(:LPXA, "Ex ante liq. premium"),
+    (:wH,   "Real Wage (Households)"),
 ];
 
+vars_agg_CM = [
+    (:GI,   "Gov. Investment"),
+    (:KG,   "Public Capital"),
+    (:Bgov, "Gov. Debt"),
+    (:G,    "Gov. Consumption"),
+    (:Y,    "Output"),
+    (:C,    "Consumption"),
+    (:I,    "Investment"),
+    (:N,    "Employment"),
+    #(:wH,  "Real Wage"),
+    (:π,    "Inflation"),
+    (:RB,   "Nominal Rate"),
+    (:T,    "Tax Revenue"),
+]
+
 vars_dist = [
+    #(:sdlogy,      "SD log Income"),
+    (:GiniI,       "Gini of Income"),
+    (:TOP10Ishare, "Top 10% Income Share"),
+    (:BOT50Ishare, "Bot 50% Income Share"),
     (:GiniC,       "Gini of Consumption"),
     (:GiniW,       "Gini of Wealth"),
-    (:GiniI,       "Gini of Income"),
-    #(:GiniInet,    "Gini of Net Income"),
     (:TOP10Wshare, "Top 10% Wealth Share"),
-    (:FrBorr,       "Fraction of Borrowers"),
-    (:TOP10Ishare, "Top 10% Income Share"),
     (:BOT50Wshare, "Bot 50% Wealth Share"),
-    (:BOT50Ishare, "Bot 50% Income Share"),
+    (:FrBorr,       "Fraction of Borrowers"),
 ];
+
+vars_inc = [
+    (:wF, "Real Wage (Firms)"),
+    (:wH, "Real Wage (Households)"),
+    (:Π_F, "Profits (Firms)"),
+    (:Π_U, "Profits (Unions)"),
+    (:Π_E, "Profits (Entrepreneurs)"),
+    (:q, "Capital Price"),
+    (:qΠ, "Profit Price"),
+    (:RL, "Liquid returns"),
+    (:RK, "Capital returns"),
+    (:RRL, "Real return on liquid assets"),
+    (:RRD, "Real return on debt"),
+    (:mc, "Price markup"),
+    (:mcw, "Wage markup"),
+    (:LPXA, "Ex ante liq. premium"),
+]
 
 style_12 = (lw = 2, color = [:blue, :red, :orange], linestyle = [:solid, :dash, :dot]);
 style_3 = (lw = 2, color = [:red, :blue, :orange], linestyle = [:dash, :solid, :dot]);
@@ -253,7 +319,7 @@ style_3 = (lw = 2, color = [:red, :blue, :orange], linestyle = [:dash, :solid, :
 # Comparison 1: HANK AR1 (TTB, debt-financed) vs. Complete Markets
 # ==============================================================================
 
-@printf "\n[1/3] HANK (TTB, debt) vs. Complete Markets\n"
+@printf "\n[1/6] HANK (TTB, debt) vs. Complete Markets\n"
 path1 = joinpath(bld_comp, "HANK_vs_CM")
 
 plot_irfs(
@@ -267,19 +333,12 @@ plot_irfs(
     suffix = "_HANKvsCM",
 )
 
-# plot_irfs(
-#     shocks_to_plot, vars_dist,
-#     [(IRFs_HANK_noTTB_plot, "HANK (TTB, debt)"), (IRFs_CM_noTTB_aligned_plot, "Complete Markets")],
-#     order_hank, ids_hank;
-#     horizon, save_fig_indiv = false, show_fig = false, save_fig = true,
-#     path = joinpath(path1, "dist"), yscale = "standard", style_options = style_12,
-# )
 
 ## =============================================================================
 # Comparison 2: Time-to-Build vs. No Time-to-Build (AR1, debt-financed)
 # ==============================================================================
 
-@printf "[2/3] TTB vs. No-TTB (AR1, debt-financed)\n"
+@printf "[2/6] TTB vs. No-TTB (AR1, debt-financed)\n"
 path2 = joinpath(bld_comp, "TTB_vs_noTTB")
 
 plot_irfs(
@@ -288,7 +347,7 @@ plot_irfs(
         (IRFs_HANK_TTB4_paper, "1-year lag"),
         (IRFs_HANK_TTB12_paper, "3-year lag")],
     order_hank, ids_hank;
-    horizon, save_fig_indiv = false, show_fig = true, save_fig = false,
+    horizon, save_fig_indiv = false, show_fig = true, save_fig = true,
     path = joinpath(path2, "agg"), yscale = "standard", style_options = style_12,
     suffix = "_TTBvsNoTTB_agg", 
 )
@@ -304,12 +363,18 @@ plot_irfs(
     suffix = "_TTBvsNoTTB_dist",
 )
 
-## ================== 2B: RANK with different TTB =========================
-IRFs_CM_TTB12_aligned_to_noTTB = align_irfs(
-    IRFs_CM_TTB12, idx_CM_TTB12, order_cm,
-    IRFs_CM_noTTB, idx_CM_noTTB, order_cm
-);
+plot_irfs(
+    shocks_to_plot, vars_inc,
+    [(IRFs_HANK_noTTB_plot, "No TTB"),
+        (IRFs_HANK_TTB4_plot, "1-year lag"),
+        (IRFs_HANK_TTB12_plot, "3-year lag")],
+    order_hank, ids_hank;
+    horizon, save_fig_indiv = false, show_fig = true, save_fig = true,
+    path = joinpath(path2, "dist"), yscale = "standard", style_options = style_12,
+    suffix = "_TTBvsNoTTB_inc",
+)
 
+## ================== 2B: RANK with different TTB =========================
 IRFs_CM_noTTB_plot    = apply_scales(IRFs_CM_noTTB, order_cm, scales);
 IRFs_CM_TTB4_plot     = apply_scales(IRFs_CM_TTB4, order_cm, scales);
 IRFs_CM_TTB12_plot    = apply_scales(IRFs_CM_TTB12, order_cm, scales);
@@ -327,7 +392,7 @@ plot_irfs(
         (IRFs_CM_TTB4_paper, "1-year lag"),
         (IRFs_CM_TTB12_paper, "3-year lag")],
     order_cm, ids_cm;
-    horizon, save_fig_indiv = false, show_fig = true, save_fig = false,
+    horizon, save_fig_indiv = false, show_fig = true, save_fig = true,
     path = joinpath(path2, "agg"), yscale = "standard", style_options = style_12,
     suffix = "_TTBvsNoTTB_CM", 
 )
@@ -336,7 +401,7 @@ plot_irfs(
 # Comparison 3: Different elasticities
 # ==============================================================================
 
-@printf "[3/3] Different output elasticities\n"
+@printf "[3/6] Different output elasticities\n"
 path3 = joinpath(bld_comp, "elasticities")
 
 plot_irfs(
@@ -374,33 +439,248 @@ plot_irfs(
         (IRFs_CM_noTTB_paper, "η_KG = 0.10"),
         (IRFs_CM_noTTB_eta20_paper, "η_KG = 0.20")],
     order_cm, ids_cm;
-    horizon, save_fig_indiv = false, show_fig = true, save_fig = false,
+    horizon, save_fig_indiv = false, show_fig = true, save_fig = true,
     path = joinpath(path3, "RANK_agg"), yscale = "standard", style_options = style_3,
     suffix = "_elast_CM"
 )
 
 # ==============================================================================
-# Comparison 4: Debt-financed vs. Tax-financed (AR1, TTB)
+# Comparison 4: No fiscal stabilization (γ_π = γ_Y = 0) vs. baseline fiscal rule (AR1, TTB)
 # ==============================================================================
 
-# @printf "[3/4] Debt-financed vs. Tax-financed (AR1, TTB)\n"
-# path2 = joinpath(bld_comp, "debt_vs_tax")
+@printf "[4/6] No fiscal stabilization \n"
+path4 = joinpath(bld_comp, "noStab")
 
-# plot_irfs(
-#     shocks_to_plot, vars_agg,
-#     [(IRFs_debt_plot, "Debt-financed"), (IRFs_tax_plot, "Tax-financed")],
-#     order_hank, ids_hank;
-#     horizon, save_fig_indiv = false, show_fig = false, save_fig = true,
-#     path = joinpath(path4, "agg"), yscale = "standard", style_options = style_2,
-# )
+plot_irfs(
+    shocks_to_plot, vars_agg,
+    [(IRFs_HANK_noTTB_paper, "Baseline"),
+    (IRFs_HANK_noTTB_noPiStab_paper, "γ_π = 0"), 
+    #(IRFs_HANK_noTTB_noStab_paper, "γ_π = γ_Y = 0")
+    ],
+    order_hank, ids_hank;
+    horizon, save_fig_indiv = false, show_fig = true, save_fig = true,
+    path = joinpath(path4, "agg"), yscale = "standard", style_options = style_12,
+    suffix = "_noStab_agg",
+)
 
-# plot_irfs(
-#     shocks_to_plot, vars_dist,
-#     [(IRFs_debt_plot, "Debt-financed"), (IRFs_tax_plot, "Tax-financed")],
-#     order_hank, ids_hank;
-#     horizon, save_fig_indiv = false, show_fig = false, save_fig = true,
-#     path = joinpath(path4, "dist"), yscale = "standard", style_options = style_2,
-# )
+plot_irfs(
+    shocks_to_plot, vars_dist,
+    [(IRFs_HANK_noTTB_paper, "Baseline"), 
+    (IRFs_HANK_noTTB_noPiStab_paper, "γ_π = 0"),
+    #(IRFs_HANK_noTTB_noStab_paper, "γ_π = γ_Y = 0")
+    ],
+    order_hank, ids_hank;
+    horizon, save_fig_indiv = false, show_fig = true, save_fig = true,
+    path = joinpath(path4, "dist"), yscale = "standard", style_options = style_12,
+    suffix = "_noStab_dist",
+)
 
+# ==============================================================================
+# Comparison 5: Reduction in Transfer level
+# ==============================================================================
+
+@printf "[5/6] Reduction in transfer level \n"
+path5 = joinpath(bld_comp, "transfers")
+
+plot_irfs(
+    shocks_to_plot, vars_agg,
+    [(IRFs_HANK_noTTB_paper, "Baseline"), 
+    (IRFs_HANK_noTTB_tr03_paper, "Transfer level: 30%"),
+    (IRFs_HANK_noTTB_tr2_paper, "Transfer withdrawal: 50%")
+     ],
+    order_hank, ids_hank;
+    horizon, save_fig_indiv = false, show_fig = true, save_fig = true,
+    path = joinpath(path5, "agg"), yscale = "standard", style_options = style_12,
+    suffix = "_transfers_agg",
+)
+
+plot_irfs(
+    shocks_to_plot, vars_dist,
+    [(IRFs_HANK_noTTB_paper, "Baseline"), 
+    (IRFs_HANK_noTTB_tr03_paper, "Transfer level: 30%"),
+    (IRFs_HANK_noTTB_tr2_paper, "Transfer withdrawal: 50%")
+     ],
+    order_hank, ids_hank;
+    horizon, save_fig_indiv = false, show_fig = true, save_fig = true,
+    path = joinpath(path5, "dist"), yscale = "standard", style_options = style_12,
+    suffix = "_transfers_dist",
+)
+
+# ==============================================================================
+# Comparison 6: Dynamic Tax Function
+# ==============================================================================
+
+@printf "[6/6] Dynamic tax function \n"
+path6 = joinpath(bld_comp, "taxes")
+
+plot_irfs(
+    shocks_to_plot, vars_agg,
+    [(IRFs_HANK_noTTB_paper, "Baseline"), 
+     (IRFs_HANK_noTTB_tax_paper, "γ_τB = 3.0, γ_τY = 1.5"),
+     (IRFs_HANK_noTTB_tax_Yneg_paper, "γ_τB = 3.0, γ_τY = -0.9")
+     ],
+    order_hank, ids_hank;
+    horizon, save_fig_indiv = false, show_fig = true, save_fig = true,
+    path = joinpath(path6, "agg"), yscale = "standard", style_options = style_12,
+    suffix = "_taxes_agg",
+)
+
+plot_irfs(
+    shocks_to_plot, vars_dist,
+    [(IRFs_HANK_noTTB_plot, "Baseline"), 
+     (IRFs_HANK_noTTB_tax_plot, "γ_τB = 3.0, γ_τY = 1.5"),
+     (IRFs_HANK_noTTB_tax_Yneg_plot, "γ_τB = 3.0, γ_τY = -0.9")
+     ],
+    order_hank, ids_hank;
+    horizon, save_fig_indiv = false, show_fig = true, save_fig = true,
+    path = joinpath(path6, "dist"), yscale = "standard", style_options = style_12,
+    suffix = "_taxes_dist",
+)
+
+
+# ==============================================================================
+# Multiplier tables
+# GI shock: cumulative PV multipliers for Y, C, GiniW, GiniI across model variants.
+#
+# Use _plot arrays (raw log-deviations, shock-scaled ×10) — NOT _paper arrays,
+# which have additional row prescaling that would distort the multiplier ratios.
+# ids_hank has the extended RR row; ss_HANK_noTTB must be non-nothing (requires
+# regenerating JLD2 files with the updated main_noestim.jl).
+# ==============================================================================
+
+@printf "\nComputing multipliers...\n"
+
+mult_vars = [:Y, :C, :GiniI, :GiniW];
+mult_horizons = [1, 40, 80];
+
+function make_mult_table(variants; vars = mult_vars, horizons = mult_horizons)
+    dfs = DataFrame[]
+    for (irfs, label) in variants
+        df = compute_pv_multipliers(
+            irfs, order_hank, ids_hank, ss_hank, :GI;
+            response_vars = vars,
+            horizons      = horizons,
+            model_name    = label,
+            scale_by_ss   = true,
+        )
+        push!(dfs, df)
+    end
+    return vcat(dfs...)
+end
+
+# Comparison: TTB vs noTTB
+mult_TTB = make_mult_table([
+    (IRFs_HANK_noTTB_plot,  "No TTB"),
+    (IRFs_HANK_TTB4_plot,   "TTB 1yr"),
+    (IRFs_HANK_TTB12_plot,  "TTB 3yr"),
+]);
+
+# Comparison: elasticities
+mult_eta = make_mult_table([
+    (IRFs_HANK_noTTB_eta5_plot,  "η = 0.05"),
+    (IRFs_HANK_noTTB_plot,       "η = 0.10"),
+    (IRFs_HANK_noTTB_eta20_plot, "η = 0.20"),
+]);
+
+# Comparison: no fiscal stabilization
+mult_noStab = make_mult_table([
+    (IRFs_HANK_noTTB_plot, "Baseline"),
+    (IRFs_HANK_noTTB_noPiStab_plot, "γ_π = 0"),
+    (IRFs_HANK_noTTB_noStab_plot, "γ_π = γ_Y = 0"),
+]);
+
+# Comparison: Reduction in transfers
+mult_trans = make_mult_table([
+    (IRFs_HANK_noTTB_plot, "Baseline"),
+    (IRFs_HANK_noTTB_tr03_paper, "Transfer level: 30%"),
+    (IRFs_HANK_noTTB_tr2_paper, "Transfer withdrawal: 50%")
+]);
+
+# Comparison: Dynamic tax function
+mult_tax = make_mult_table([
+    (IRFs_HANK_noTTB_plot, "Baseline"),
+    (IRFs_HANK_noTTB_tax_paper, "γ_τB = 3.0, γ_τY = 1.5"),
+    (IRFs_HANK_noTTB_tax_Yneg_paper, "γ_τB = 3.0, γ_τY = -0.9")
+]);
+
+using PrettyTables
+@printf "\n--- GI multipliers: TTB vs No-TTB ---\n"
+pretty_table(mult_TTB; header = names(mult_TTB), title = "PV Multipliers (GI shock)",
+    formatters = ft_printf("%.4f", 2:length(mult_vars)+1))
+
+@printf "\n--- GI multipliers: output elasticity ---\n"
+pretty_table(mult_eta; header = names(mult_eta), title = "PV Multipliers (GI shock)",
+    formatters = ft_printf("%.4f", 2:length(mult_vars)+1))
+
+@printf "\n--- GI multipliers: No fiscal stabilization ---\n"
+pretty_table(mult_noStab; header = names(mult_noStab), title = "PV Multipliers (GI shock)",
+    formatters = ft_printf("%.4f", 2:length(mult_vars)+1))
+    
+@printf "\n--- GI multipliers RANK: Transfer changes ---\n"
+ pretty_table(mult_trans; header = names(mult_trans), title = "PV Multipliers (GI shock)",
+     formatters = ft_printf("%.4f", 2:length(mult_vars)+1))
+
+@printf "\n--- GI multipliers: Dynamic tax function ---\n"
+pretty_table(mult_tax; header = names(mult_tax), title = "PV Multipliers (GI shock)",
+    formatters = ft_printf("%.4f", 2:length(mult_vars)+1))
+
+# Save to CSV
+mkpath(bld_comp)
+CSV.write(joinpath(bld_comp, "multipliers_TTB.csv"), mult_TTB);
+CSV.write(joinpath(bld_comp, "multipliers_eta.csv"), mult_eta);
+CSV.write(joinpath(bld_comp, "multipliers_noStab.csv"), mult_noStab);
+CSV.write(joinpath(bld_comp, "multipliers_transfers.csv"), mult_trans);
+# ==============================================================================
+# Shock comparison: GI vs. Gshock for the same model
+# plot_irfs_cat places both shocks as lines on the same subplot — one panel per
+# variable. Use _paper arrays so the ×10 shock scaling and rate prescaling are
+# already applied.
+# ==============================================================================
+
+@printf "\nShock comparison (GI vs. G)...\n"
+fiscal_shocks  = Dict(("Fiscal", "fis") => [:GI, :Gshock])
+fiscal_labels  = Dict(:GI => "Gov. Investment", :Gshock => "Gov. Consumption")
+style_shocks   = (lw = 2, color = [:blue, :red], linestyle = [:solid, :dash])
+
+vars_agg_shocks = [
+    (:Y, "Output"),
+    (:C, "Consumption"),
+    (:I, "Investment"),
+    (:N, "Employment"),
+    (:π, "Inflation"),
+    (:RB, "Nominal Rate"),
+    (:T, "Tax Revenue"),
+    #(:wH, "Real Wage (Households)"),
+]
+
+vars_dist_shocks = [
+    (:GiniI, "Gini of Income"),
+    (:TOP10Ishare, "Top 10% Income Share"),
+    (:BOT50Ishare, "Bot 50% Income Share"),
+    (:GiniC, "Gini of Consumption"),
+    (:GiniW, "Gini of Wealth"),
+    (:TOP10Wshare, "Top 10% Wealth Share"),
+    (:BOT50Wshare, "Bot 50% Wealth Share"),
+]
+
+path_shocks = joinpath(bld_comp, "GI_vs_G")
+
+plot_irfs_cat(
+    fiscal_shocks, vars_agg_shocks,
+    IRFs_HANK_noTTB_paper, order_hank, ids_hank;
+    horizon, shock_labels = fiscal_labels,
+    show_fig = true, save_fig = true,
+    path = joinpath(path_shocks, "noTTB_agg"),
+    yscale = "standard", style_options = style_shocks,
+)
+
+plot_irfs_cat(
+    fiscal_shocks, vars_dist_shocks,
+    IRFs_HANK_noTTB_paper, order_hank, ids_hank;
+    horizon, shock_labels = fiscal_labels,
+    show_fig = true, save_fig = true,
+    path = joinpath(path_shocks, "noTTB_dist"),
+    yscale = "standard", style_options = style_shocks,
+)
 
 @printf "\nDone. All comparison plots saved to:\n  %s\n" bld_comp

@@ -7,6 +7,10 @@
         ids;
         horizon = 40,
         factor = 100,
+        fig_size = (1800, 0),
+        ncols = 4,
+        subplot_bottom_margin = nothing,
+        subplot_left_margin = nothing,
         show_fig = true,
         save_fig = false,
         save_fig_indiv = false,
@@ -37,6 +41,13 @@ produced by `compute_irfs`, organized by shock categories.
   - `horizon::Int64`: The time horizon (number of periods) over which IRFs are plotted.
     Default is `40`.
   - `factor::Int64`: Scaling factor for the IRFs (default: `100`).
+  - `fig_size::Tuple{Int,Int}`: Total figure size `(width, height)`. When height is `0`
+    (default), it is computed automatically as `250 * nrow + 150`.
+  - `ncols::Int`: Number of subplot columns (default: `4`).
+  - `subplot_bottom_margin`: Absolute padding below each subplot for x-axis tick labels.
+    Pass a `Measures` value or leave as `nothing` to use `8 * Plots.mm`.
+  - `subplot_left_margin`: Absolute padding left of each subplot for y-axis tick labels.
+    Same convention as `subplot_bottom_margin` (default: `8 * Plots.mm`).
   - `show_fig::Bool`: If `true`, displays the plot. Default is `true`.
   - `save_fig::Bool`: If `true`, saves the combined plot as a PDF. Default is `false`.
   - `save_fig_indiv::Bool`: If `true`, saves individual plots for each variable or shock
@@ -50,6 +61,9 @@ produced by `compute_irfs`, organized by shock categories.
     subplots from the data; when provided as a tuple, uses it as `(ymin, ymax)`; when
     provided as a dictionary, applies specified y-axis limits for each variable. Default is
     `"standard"`, which applies default scaling.
+  - `shock_labels::Dict{Symbol,String}`: Optional display names for shocks used in legend
+    labels. Symbols absent from the dict fall back to `string(shock)`. Example:
+    `Dict(:GI => "Gov. Investment", :Gshock => "Gov. Consumption")`.
   - `style_options::NamedTuple`: A named tuple specifying stylistic options for the plots,
     including line width (`lw`), color (default: `:auto`), and linestyle (default:
     `:solid`). Default is `(lw = 2, color = :auto, linestyle = :solid)`.
@@ -60,24 +74,43 @@ function plot_irfs_cat(
     IRFs_to_plot::Array{Float64,3},
     IRFs_order::Vector{Symbol},
     ids;
-    horizon::Int64 = 40,
-    factor::Int64 = 100,
-    show_fig::Bool = true,
-    save_fig::Bool = false,
+    horizon::Int64    = 40,
+    factor::Int64     = 100,
+    fig_size::Tuple{Int,Int} = (1800, 0),
+    ncols::Int        = 4,
+    subplot_bottom_margin = nothing,
+    subplot_left_margin   = nothing,
+    shock_labels::Dict{Symbol,String} = Dict{Symbol,String}(),
+    show_fig::Bool    = true,
+    save_fig::Bool    = false,
     save_fig_indiv::Bool = false,
-    path::String = "",
-    suffix::String = "",
+    path::String      = "",
+    suffix::String    = "",
     yscale::Union{String,Tuple{Number,Number},Dict{Symbol,Tuple{Number,Number}}} = "standard",
     style_options::NamedTuple = (lw = 2, color = :auto, linestyle = :solid),
 )
+    # Layout: +1 for the shock-panel prepended to the variable panels
+    n_subplots = length(vars_to_plot) + 1
+    ncol       = ncols
+    nrow       = ceil(Int, n_subplots / ncol)
+    fig_height = fig_size[2] == 0 ? 250 * nrow + 150 : fig_size[2]
+    fig_width  = fig_size[1]
+
+    _bottom_margin = isnothing(subplot_bottom_margin) ? 8 * Plots.mm : subplot_bottom_margin
+    _left_margin   = isnothing(subplot_left_margin)   ? 8 * Plots.mm : subplot_left_margin
 
     # General stylistic choices for the plots
     pp_layout = (
-        lw = 2,
-        dpi = 300,
-        size = (1600, 1000),
+        dpi    = 600,
+        size   = (fig_width, fig_height),
         foreground_color_legend = nothing,
         background_color_legend = nothing,
+        tickfont  = font(14, "Computer Modern"),
+        titlefont = font(16, "Computer Modern"),
+        legendfont = font(14, "Computer Modern"),
+        bottom_margin = _bottom_margin,
+        left_margin   = _left_margin,
+        lw = style_options.lw,
     )
 
     # Unpack variables and labels
@@ -100,7 +133,7 @@ function plot_irfs_cat(
             continue
         end
 
-        # Extract IRFs for these shocks, round to 10 digits, and multiply by 100
+        # Extract IRFs for these shocks, round to 10 digits, and multiply by factor
         i_IRFs = mapround(IRFs_to_plot[:, :, idx]; digits = 10) .* factor
         n_IRFs = size(i_IRFs, 3)
 
@@ -148,30 +181,27 @@ function plot_irfs_cat(
 
         # Create a plot for each variable
         pp = []
-        for (i, (var, lab)) in enumerate(zip(vars, labs))
+        for (var, lab) in zip(vars, labs)
             if hasfield(typeof(ids), var)
                 var_idx = getfield(ids, var)
                 p = plot(
                     i_IRFs[var_idx, 1:horizon, 1];
                     title = lab,
-                    label = string(category_shocks[1]),
+                    label = get(shock_labels, category_shocks[1], string(category_shocks[1])),
                     lw = style_options.lw,
                     color = effective_color[1],
                     linestyle = effective_linestyle[1],
-                    tickfont = font(10, "Computer Modern"),
-                    titlefont = font(12, "Computer Modern"),
                 )
                 for j = 2:n_IRFs
                     plot!(
                         p,
                         i_IRFs[var_idx, 1:horizon, j];
-                        label = string(category_shocks[j]),
+                        label = get(shock_labels, category_shocks[j], string(category_shocks[j])),
                         lw = style_options.lw,
                         color = effective_color[j],
                         linestyle = effective_linestyle[j],
                     )
                 end
-                # Apply y-axis limits based on dictionary values
                 if yscale isa Dict && haskey(yscale, var)
                     ylims!(p, ylimits_per_variable[var]...)
                 elseif yscale == "common" || yscale isa Tuple{Number,Number}
@@ -185,21 +215,15 @@ function plot_irfs_cat(
             push!(pp, p)
         end
 
-        # Add panel for the shocks
-        p = plot(;
-            title = category_name[1],
-            lw = style_options.lw,
-            linestyle = style_options.linestyle,
-            tickfont = font(10, "Computer Modern"),
-            titlefont = font(12, "Computer Modern"),
-        )
+        # Shock panel prepended — shows each shock's own IRF with legend
+        p_shock = plot(; title = category_name[1], lw = style_options.lw)
         for (i, var) in enumerate(category_shocks)
             if hasfield(typeof(ids), var)
                 var_idx = getfield(ids, var)
                 plot!(
-                    p,
+                    p_shock,
                     i_IRFs[var_idx, 1:horizon, i];
-                    label = string(var),
+                    label = get(shock_labels, var, string(var)),
                     lw = style_options.lw,
                     color = effective_color[i],
                     linestyle = effective_linestyle[i],
@@ -208,26 +232,21 @@ function plot_irfs_cat(
                 @printf "Variable %s not found in ids\n" var
             end
         end
-        pp = [p; pp...]
+        pp = [p_shock; pp...]
 
-        # Combine all plots in a single figure, with a layout of nrow x ncol
-        n = length(pp)
-        ncol = ceil(Int, sqrt(n))
-        nrow = ceil(Int, n / ncol)
+        # Combine all plots in a single figure
         fig = plot(pp...; layout = (nrow, ncol), pp_layout...)
 
-        # Save combined plot directly in the IRFs folder
         if save_fig
             savefig(fig, joinpath(irfs_path, "IRF_" * category_name[2] * suffix * ".pdf"))
         end
 
-        # Save individual plots directly inside each category folder
         if save_fig_indiv
             category_path = joinpath(irfs_path, category_name[2])
             mkpath(category_path)
             for (i, p) in enumerate(pp)
                 p = plot!(p; legend = true, pp_layout...)
-                var_name = i > length(vars) ? "ShockPanel" : string(vars[i])  # Handle extra subplot
+                var_name = i == 1 ? "ShockPanel" : string(vars[i - 1])
                 savefig(
                     p,
                     joinpath(
@@ -238,9 +257,6 @@ function plot_irfs_cat(
             end
         end
 
-        # Show plot
-        if show_fig
-            display(fig)
-        end
+        show_fig && display(fig)
     end
 end

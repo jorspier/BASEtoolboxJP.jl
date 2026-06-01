@@ -100,17 +100,28 @@ IRFs, _, IRFs_order = compute_irfs(
 );
 
 # Export IRFs
-idx_dict_CM_noTTB_HANKpars = Dict{Symbol, Int}(
-    name => getfield(sr_full.indexes, name) 
-    for name in fieldnames(typeof(sr_full.indexes)) 
+idx_dict_CM_noTTB = Dict{Symbol, Int}(
+    name => getfield(sr_full.indexes, name)
+    for name in fieldnames(typeof(sr_full.indexes))
     if getfield(sr_full.indexes, name) isa Int
         && !endswith(string(name), "SS")
 )
-jldsave(paths["bld_example"] * "/IRFs_CM_noTTB_HANKpars.jld2", true; 
-    IRFs, 
-    IRFs_order, 
+
+# Steady-state scalars — shared across all CM variants, saved once to its own file.
+ss_dict = Dict{Symbol, Float64}(
+    :Y     => exp(sr_full.XSS[sr_full.indexes.YSS]),
+    :C     => exp(sr_full.XSS[sr_full.indexes.CSS]),
+    :GI    => exp(sr_full.XSS[sr_full.indexes.GISS]),
+    :GiniW => exp(sr_full.XSS[sr_full.indexes.GiniWSS]),
+    :GiniI => exp(sr_full.XSS[sr_full.indexes.GiniISS]),
+)
+jldsave(paths["bld_example"] * "/ss_dict.jld2"; ss_dict)
+
+jldsave(paths["bld_example"] * "/IRFs_CM_noTTB.jld2", true;
+    IRFs,
+    IRFs_order,
     # IRFs_dist,
-    idx_dict_CM_noTTB_HANKpars
+    idx_dict_CM_noTTB,
 )
 
 # Compute variance decomposition of IRFs
@@ -253,9 +264,9 @@ plot_irfs_cat(
 
 
 # Print cumulative mutipliers
-println("\n--- Cumulative PV Multipliers: Public Investment (GI) ---")
-table_GI = compute_pv_multipliers(IRFs, IRFs_order, sr_full.indexes_r, sr_full.XSS, :GI; max_horizon = 100)
-display(table_GI)
+# println("\n--- Cumulative PV Multipliers: Public Investment (GI) ---")
+# table_GI = compute_pv_multipliers(IRFs, IRFs_order, sr_full.indexes_r, sr_full.XSS, :GI; max_horizon = 100)
+# display(table_GI)
 
 # jldsave(paths["bld_example"] * "/Multipliers_CM_debt_TTB12.jld2", true; 
 #     table_GI

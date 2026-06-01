@@ -417,6 +417,37 @@ write_csv(master_growth_stationary, "examples/Data/GER_growth.csv", na = "NaN")
 ## ------ 5. Retrieve averages for targets/ calibration -----
 ## ----------------------------------------------------------
 
+## Post tax income shares
+T10NetInc <- download_wid(indicator = "sdiinc",
+                            perc = "p90p100", 
+                            areas = "DE", 
+                            pop = "j", 
+                            ages = "992") %>%
+                            filter(year >= 1991) %>%
+                            select(year, value) %>%
+                            rename(T10NetInc = value)
+
+T10NetInc <- T10NetInc %>%
+    mutate(year = as.Date(paste0(year, "-01-01"))) %>%
+    rename(period = year)
+
+T10NetInc_avg <- mean(T10NetInc$T10NetInc, na.rm = TRUE)
+
+B50NetInc <- download_wid(indicator = "sdiinc",
+                            perc = "p0p50", 
+                            areas = "DE", 
+                            pop = "j", 
+                            ages = "992") %>%
+                            filter(year >= 1991) %>%
+                            select(year, value) %>%
+                            rename(B50NetInc = value)
+
+B50NetInc <- B50NetInc %>%
+    mutate(year = as.Date(paste0(year, "-01-01"))) %>%
+    rename(period = year)
+
+B50NetInc_avg <- mean(B50NetInc$B50NetInc, na.rm = TRUE)
+
 # Top 10% shares
 T10Iavg <- mean(master$T10Ishare, na.rm = TRUE)
 T10Wavg <- mean(master$T10Wshare, na.rm = TRUE)
@@ -532,7 +563,7 @@ GDP_tot <- rdb(ids = "Eurostat/NAMA_10_GDP/A.CP_MEUR.B1GQ.DE") %>%
     select(period, value) %>%
     filter(period >= as.Date("1999-01-01")) %>%
     mutate(value = value * 1e6) # from million to euro
-
+24
 KY_tot <- mean(K_S1$value, na.rm = TRUE) / mean(GDP_tot$value, na.rm = TRUE)
 KY_priv <- mean(K_priv_nr$value, na.rm = TRUE) / mean(GDP_tot$value, na.rm = TRUE)
 KY_ngov <- mean(K_ngov$value, na.rm = TRUE) / mean(GDP_tot$value, na.rm = TRUE)

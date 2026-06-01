@@ -322,7 +322,7 @@ F[indexes.GI_lag12] = (log(GI_lag12Prime)) - (log(GI_lag11))
 
 
 # Finished public capital
-F[indexes.KG] = (log(KGPrime)) - (log((1.0 - m_par.δ_KG) * KG + GI_lag4))
+F[indexes.KG] = (log(KGPrime)) - (log((1.0 - m_par.δ_KG) * KG + GI_lag1))
 
 # Effective TFP
 F[indexes.Z] = (log(Z)) - 

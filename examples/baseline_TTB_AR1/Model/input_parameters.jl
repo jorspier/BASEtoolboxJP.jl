@@ -154,7 +154,7 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
         true
         
     γ_π::T =
-        -2.1737350397931947 |
+        -2.1737350397931947 | # -2.1737350397931947
         "gamma_pi" |
         "reaction of deficit to inflation" |
         L"\gamma_{\pi}" |
@@ -415,7 +415,7 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
         false
 
     η_KG::T = 
-        0.10 | 
+        0.10| 
         "eta_KG" | 
         "elasticity of public capital stock" | 
         L"\eta_{K^G}" | 

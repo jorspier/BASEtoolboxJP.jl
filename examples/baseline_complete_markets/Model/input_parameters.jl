@@ -39,7 +39,7 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
     # Household preference parameters
     ξ::T = 4.0 | "xi" | "risk aversion" | L"\xi" | _ | false
     γ::T = 2.0 | "gamma" | "inverse Frisch elasticity" | L"\gamma" | _ | false
-    β::T = 0.9875734048672768 | "beta" | "discount factor" | L"\beta" | _ | false # 0.9954931581896761
+    β::T = 0.9954931581896761 | "beta" | "discount factor" | L"\beta" | _ | false # 0.9875734048672768
     λ::T = 0.04411244973163206 | "lambda" | "illiquid asset adjustment probability" | L"\lambda" | _ | false # 0.053362065374623756
 
     # Individual income process
@@ -59,7 +59,7 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
     κw::T = 0.23931075416274708 | "kappa_w" | "wage adjustment costs" | L"\kappa_w" | _ | false # 0.23931
 
     # Further steady-state parameters
-    Tlev::T = 1.1006962925529395 | "tau_lev" | "income tax rate level" | L"\tau^l" | _ | false # 0.0622398797972143
+    Tlev::T = 1.0622398797972143 | "tau_lev" | "income tax rate level" | L"\tau^l" | _ | false # 0.1006962925529395
     Tprog::T = 1.0 + 0.221 | "tau_pro" | "income tax rate progressivity" | L"\tau^p" | _ | false
     Tc::T = 1.0 + 0.19 | "Tc" | "VAT rate (gross)" | L"T_c" | _ | false
     Tk::T = 1.0 + 0.25 | "Tk" | "capital income tax rate (gross)" | L"T_k" | _ | false
@@ -73,7 +73,7 @@ parameter::T = value | "ascii_name" | L"latex_name" | prior_distribution | estim
     ψ::T = 0.3403 | "psi" | "share of capital in liquid assets" | L"\psi" | _ | false
 
     # Tradable shares
-    ωΠ::T = 0.18 | "omegaPi" | "fraction tradable profits" | L"\omega^{\Pi}" | _ | false #0.23944475284866318
+    ωΠ::T = 0.23944475284866318 | "omegaPi" | "fraction tradable profits" | L"\omega^{\Pi}" | _ | false #0.18
     ιΠ::T = 0.0137 | "iotaPi" | "fraction depreciating shares" | L"\iota^{\Pi}" | _ | false
 
     # monetary policy
